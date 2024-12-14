@@ -63,11 +63,12 @@ import java.util.concurrent.locks.ReentrantLock;
  * Main class for the VelocityPteroPower plugin.
  * This class handles the initialization of the plugin and the registration of commands and events.
  */
-@Plugin(id = "velocity-ptero-power", name = "VelocityPteroPower", version = "0.9.2.4", authors = {"TubYoub"}, description = "A plugin for Velocity that allows you to manage your Pterodactyl/Pelican servers from the Velocity console.", url = "https://github.com/TubYoub/VelocityPteroPower")
+@Plugin(id = "velocity-ptero-power", name = "VelocityPteroPower", version = "0.9.3", authors = {"TubYoub"}, description = "A plugin for Velocity that allows you to manage your Pterodactyl/Pelican servers from the Velocity console.", url = "https://github.com/TubYoub/VelocityPteroPower")
 public class VelocityPteroPower {
-    private final String version = "0.9.2.4";
-    private final String modrinthID = "";
+    private final String version = "0.9.3";
+    private final String project = "1dDr5J4w";
     private final int pluginId = 21465;
+
     private final ProxyServer proxyServer;
     private final ComponentLogger logger;
     private final Path dataDirectory;
@@ -75,6 +76,7 @@ public class VelocityPteroPower {
     private final CommandManager commandManager;
     private final ConfigurationManager configurationManager;
     private final MessagesManager messagesManager;
+    private VersionChecker.VersionInfo versionInfo;
     private PanelAPIClient apiClient;
     private final Metrics.Factory metricsFactory;
     private final Set<String> startingServers = ConcurrentHashMap.newKeySet();
@@ -132,12 +134,46 @@ public class VelocityPteroPower {
 
         this.serverInfoMap = configurationManager.getServerInfoMap();
         Metrics metrics = metricsFactory.make(this, pluginId);
-        logger.info("VelocityPteroPower succesfully loaded");
-        if (configurationManager.isCheckUpdate()){
-            if (VersionChecker.isNewVersionAvailable(version)){
-                logger.warn("There is a new Version of VelocityPteroPower");
+
+        if (configurationManager.isCheckUpdate()) {
+            versionInfo = VersionChecker.isNewVersionAvailable(version, project);
+            if (versionInfo.isNewVersionAvailable) {
+                switch  (versionInfo.urgency) {
+                    case CRITICAL:
+                        this.getLogger().warn("--- Important Update --- ");
+                        this.getLogger().warn("There is a new critical update for VelocityPteroPower available");
+                        this.getLogger().warn("please update NOW");
+                        this.getLogger().warn("https://modrinth.com/plugin/velocitypteropower/version/" + versionInfo.latestVersion);
+                        this.getLogger().warn("backup your config");
+                        this.getLogger().warn("---");
+                        break;
+                    case HIGH:
+                        this.getLogger().warn("--- Important Update --- ");
+                        this.getLogger().warn("There is a new critical update for VelocityPteroPower available");
+                        this.getLogger().warn("please update NOW");
+                        this.getLogger().warn("https://modrinth.com/plugin/velocitypteropower/version/" + versionInfo.latestVersion);
+                        this.getLogger().warn("backup your config");
+                        this.getLogger().warn("---");
+                        break;
+                    case NORMAL:
+                        this.getLogger().warn("There is a new update for VelocityPteroPower available");
+                        this.getLogger().warn("https://modrinth.com/plugin/velocitypteropower/version/" + versionInfo.latestVersion);
+                        this.getLogger().warn("backup your config");
+                        break;
+                    case LOW:
+                        // beta update urgency currently not needed
+                        break;
+                    case NONE:
+                        // alpha update urgency currently not needed
+                        break;
+                }
+            } else {
+                this.getLogger().info(" You are running the latest version of VelocityPteroPower");
             }
+        } else {
+            this.getLogger().info("You have automatic checks for new updates disabled. Enable them in the config to stay up to date");
         }
+        logger.info("VelocityPteroPower succesfully loaded");
     }
 
     /**
