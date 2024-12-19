@@ -19,6 +19,7 @@ server-restarting: "Restarting server: %server%"
 config-reload: "Configuration reloaded"
 available-commands-helpcommand: "Available commands:"
 server-not-found: "Server not found in configuration: %server%"
+cooldown-active: "You are on cooldown. Please wait %timeout% seconds before starting another server."
 
 # console messages
 shutdown-scheduled: "Scheduling server shutdown for %server% in %timeout% seconds."

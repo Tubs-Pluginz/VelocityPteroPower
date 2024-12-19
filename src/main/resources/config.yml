@@ -34,6 +34,15 @@ shutdownRetries: 3
 # default: 30
 shutdownRetryDelay: 30
 
+# How long to wait before shutting down the server if no player joined the server(in seconds)
+# default: 300
+# -1 = disabled
+idleStartShutdownTime: 300
+
+# How long to wait before allowing a player to start a server again (in seconds)
+# default: 10
+playerStartCooldown: 10
+
 # This is used to check the server status to transfer players after the server starts
 startupJoin:
   # Once the server is pingable, wait the specified number of seconds before sending the player to the server

@@ -54,6 +54,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -84,6 +85,7 @@ public class VelocityPteroPower {
     private final AtomicInteger remainingRequests = new AtomicInteger(60); // Default value, will be updated
     private final ReentrantLock rateLimitLock = new ReentrantLock();
     private final Map<String, Integer> retryCounts = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> playerCooldowns = new ConcurrentHashMap<>();
 
     /**
      * Constructor for the VelocityPteroPower class.
@@ -250,6 +252,20 @@ public class VelocityPteroPower {
         this.serverInfoMap = configurationManager.getServerInfoMap();
         PteroServerInfo serverInfo = serverInfoMap.get(serverName);
 
+        long currentTime = System.currentTimeMillis();
+        long lastStartTime = playerCooldowns.getOrDefault(player.getUniqueId(), 0L);
+        int cooldownTime = configurationManager.getPlayerCommandCooldown() * 1000; // Convert to milliseconds
+
+        if (currentTime - lastStartTime < cooldownTime) {
+            long remainingSeconds = (cooldownTime - (currentTime - lastStartTime)) / 1000;
+            player.sendMessage(
+                this.getPluginPrefix()
+                .append(Component.text(messagesManager.getMessage("cooldown-active")
+                        .replace("%timeout%", String.valueOf(remainingSeconds)), NamedTextColor.WHITE)));
+            event.setResult(ServerPreConnectEvent.ServerResult.denied());
+            return;
+        }
+
         if (!serverInfoMap.containsKey(serverName)) {
             logger.warn(messagesManager.getMessage("server-not-found")
                     .replace("%server%", serverName));
@@ -273,7 +289,7 @@ public class VelocityPteroPower {
             event.setResult(ServerPreConnectEvent.ServerResult.denied());
             return;
         }
-
+        playerCooldowns.put(player.getUniqueId(), currentTime);
         startingServers.add(serverName);
         apiClient.powerServer(serverInfo.getServerId(), "start");
         player.sendMessage(

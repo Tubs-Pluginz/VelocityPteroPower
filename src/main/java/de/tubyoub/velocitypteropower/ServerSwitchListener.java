@@ -32,6 +32,7 @@ import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import com.velocitypowered.api.scheduler.ScheduledTask;
 import de.tubyoub.velocitypteropower.api.PanelAPIClient;
+import  com.velocitypowered.api.proxy.Player;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
 import org.slf4j.Logger;
 
@@ -98,6 +99,12 @@ public class ServerSwitchListener {
     @Subscribe
     public void onServerSwitch(ServerConnectedEvent event) {
         Optional<RegisteredServer> previousServerConnection = event.getPreviousServer();
+        RegisteredServer server = event.getServer();
+
+        if (event.getPlayer() == null || event.getServer() == null || server.getServerInfo() == null || server.getServerInfo().getName() == null) {
+            return;
+        }
+
         if (previousServerConnection.isPresent()) {
             String serverName = previousServerConnection.get().getServerInfo().getName();
             PteroServerInfo serverInfo = plugin.getServerInfoMap().get(serverName);
