@@ -50,6 +50,7 @@ import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
+import java.net.InetSocketAddress;
 import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.util.Map;
@@ -252,6 +253,33 @@ public class VelocityPteroPower {
         this.serverInfoMap = configurationManager.getServerInfoMap();
         PteroServerInfo serverInfo = serverInfoMap.get(serverName);
 
+        InetSocketAddress virtualHost = player.getVirtualHost().orElse(null);
+        // Check if this is a forced host connection
+        if (virtualHost != null && proxyServer.getConfiguration().getForcedHosts().containsKey(virtualHost) && event.getOriginalServer().getServerInfo().equals(proxyServer.getConfiguration().getForcedHosts().get(virtualHost))) {
+
+            // If server not in config, do nothing and let default behavior handle it
+            if (!serverInfoMap.containsKey(serverName)) {
+                return;
+            }
+
+            // Check if server is offline and needs starting
+            if (!apiClient.isServerOnline(serverName) && this.canMakeRequest()) {
+
+                // Start the server
+                startingServers.add(serverName);
+                apiClient.powerServer(serverInfo.getServerId(), "start");
+
+                // Kick player with startup message
+                player.disconnect(Component.text(messagesManager.getMessage("starting-server")
+                        .replace("%server%", serverName)));
+
+                // Schedule server status check
+                checkInitialServerActivity(serverName, serverInfo.getServerId());
+
+                event.setResult(ServerPreConnectEvent.ServerResult.denied());
+                return;
+            }
+        }
         long currentTime = System.currentTimeMillis();
         long lastStartTime = playerCooldowns.getOrDefault(player.getUniqueId(), 0L);
         int cooldownTime = configurationManager.getPlayerCommandCooldown() * 1000; // Convert to milliseconds
