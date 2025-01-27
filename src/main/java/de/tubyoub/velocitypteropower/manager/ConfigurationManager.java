@@ -59,6 +59,7 @@ public class ConfigurationManager {
     private YamlDocument config;
     private String panelUrl;
     private String apiKey;
+    private String limboServer;
     private PanelType panel;
     private boolean checkUpdate;
     private boolean printRateLimit;
@@ -112,6 +113,7 @@ public class ConfigurationManager {
             shutdownRetries = (int) config.get("shutdownRetries", 3);
             idleStartShutdownTime = (int) config.get("idleStartShutdownTime", 300);
             playerCommandCooldown = (int) config.get("playerCommandCooldown", 10);
+            limboServer = (String) config.get("limboServer");
             Section startupJoinSection = config.getSection("startupJoin");
             Map<String, Object> startupJoin = new HashMap<>();
             if (startupJoinSection != null) {
@@ -277,5 +279,9 @@ public class ConfigurationManager {
     }
     public int getIdleStartShutdownTime(){
         return idleStartShutdownTime;
+    }
+
+    public String getLimboServerName() {
+        return limboServer;
     }
 }

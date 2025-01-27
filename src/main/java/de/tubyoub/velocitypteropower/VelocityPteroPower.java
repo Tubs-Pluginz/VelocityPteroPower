@@ -269,9 +269,18 @@ public class VelocityPteroPower {
                 startingServers.add(serverName);
                 apiClient.powerServer(serverInfo.getServerId(), "start");
 
-                // Kick player with startup message
-                player.disconnect(Component.text(messagesManager.getMessage("starting-server")
+                String limboServerName = configurationManager.getLimboServerName();
+                if (limboServerName != "changeMe") {
+                    RegisteredServer limboServer = proxyServer.getServer(limboServerName).orElseThrow(() -> new RuntimeException("Limbo server not found: " + limboServerName));
+                    if (apiClient.isServerOnline(String.valueOf(serverInfoMap.get(serverInfoMap.get(limboServerName).getServerId())))) {
+                        player.createConnectionRequest(limboServer).fireAndForget();
+                    }
+                }else{
+                     player.disconnect(Component.text(messagesManager.getMessage("starting-server")
                         .replace("%server%", serverName)));
+                }
+                // Kick player with startup message
+
 
                 // Schedule server status check
                 checkInitialServerActivity(serverName, serverInfo.getServerId());
@@ -280,6 +289,7 @@ public class VelocityPteroPower {
                 return;
             }
         }
+
         long currentTime = System.currentTimeMillis();
         long lastStartTime = playerCooldowns.getOrDefault(player.getUniqueId(), 0L);
         int cooldownTime = configurationManager.getPlayerCommandCooldown() * 1000; // Convert to milliseconds

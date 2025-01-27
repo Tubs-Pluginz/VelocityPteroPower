@@ -43,6 +43,11 @@ idleStartShutdownTime: 300
 # default: 10
 playerStartCooldown: 10
 
+# Server Name from your limbo
+# should be a configured server so it can be automatically started
+# changeMe = not configured so limbo server won't be connected
+limboServer: changeMe
+
 # This is used to check the server status to transfer players after the server starts
 startupJoin:
   # Once the server is pingable, wait the specified number of seconds before sending the player to the server
