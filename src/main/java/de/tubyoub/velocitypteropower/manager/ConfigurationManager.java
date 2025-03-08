@@ -46,6 +46,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -70,6 +71,7 @@ public class ConfigurationManager {
     private int shutdownRetries;
     private int idleStartShutdownTime;
     private int playerCommandCooldown;
+    private List<String> stopAllIgnoreList;
     private final VelocityPteroPower plugin;
     private final Logger logger;
     private Map<String, PteroServerInfo> serverInfoMap;
@@ -114,6 +116,7 @@ public class ConfigurationManager {
             idleStartShutdownTime = (int) config.get("idleStartShutdownTime", 300);
             playerCommandCooldown = (int) config.get("playerCommandCooldown", 10);
             limboServer = (String) config.get("limboServer");
+            stopAllIgnoreList = config.getStringList("stopIdleIgnore");
             Section startupJoinSection = config.getSection("startupJoin");
             Map<String, Object> startupJoin = new HashMap<>();
             if (startupJoinSection != null) {
@@ -284,4 +287,9 @@ public class ConfigurationManager {
     public String getLimboServerName() {
         return limboServer;
     }
+
+    public List<String> getStopAllIgnoreList() {
+        return stopAllIgnoreList;
+    }
+
 }

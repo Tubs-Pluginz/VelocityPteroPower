@@ -1,6 +1,6 @@
 # Dont touch this
 #------------
-fileversion: 2
+fileversion: 3
 #------------
 # player messages
 # the prefix is shown before every message send to the player
@@ -20,6 +20,12 @@ config-reload: "Configuration reloaded"
 available-commands-helpcommand: "Available commands:"
 server-not-found: "Server not found in configuration: %server%"
 cooldown-active: "You are on cooldown. Please wait %timeout% seconds before starting another server."
+#stopall
+stopping-all-servers: "Stopping all %count% servers. This may take some time." # %count% is replaced with the number of servers
+no-servers-found: "No servers found in configuration to stop."
+
+rate-limit-exceeded: "API rate limit exceeded. Not all servers could be stopped."
+
 
 # console messages
 shutdown-scheduled: "Scheduling server shutdown for %server% in %timeout% seconds."

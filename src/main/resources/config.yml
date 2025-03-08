@@ -4,7 +4,7 @@
 ################################
 
 # Version of the configuration file
-fileversion: 6
+fileversion: 7
 
 # Check for updates
 # If true, the plugin will check for updates on startup.
@@ -47,6 +47,13 @@ playerStartCooldown: 10
 # should be a configured server so it can be automatically started
 # changeMe = not configured so limbo server won't be connected
 limboServer: changeMe
+
+# Servers to ignore when the stopIdle command is used
+# THIS DOES NOT AFFECT forceStop
+stopIdleIgnore:
+  - hub
+  - lobby
+  - limbo
 
 # This is used to check the server status to transfer players after the server starts
 startupJoin:
