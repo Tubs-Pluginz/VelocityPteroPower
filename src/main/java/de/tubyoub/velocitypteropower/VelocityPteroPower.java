@@ -67,7 +67,14 @@ import java.util.concurrent.locks.ReentrantLock;
  * Main class for the VelocityPteroPower plugin.
  * This class handles the initialization of the plugin and the registration of commands and events.
  */
-@Plugin(id = "velocity-ptero-power", name = "VelocityPteroPower", version = "0.9.3.1", authors = {"TubYoub"}, description = "A plugin for Velocity that allows you to manage your Pterodactyl/Pelican servers from the Velocity console.", url = "https://github.com/TubYoub/VelocityPteroPower")
+@Plugin(
+    id = "velocity-ptero-power",
+    name = "VelocityPteroPower",
+    version = "0.9.4",
+    authors = {"TubYoub"},
+    description = "Manage Pterodactyl/Pelican servers via Velocity.",
+    url = "https://github.com/BT-Pluginz/VelocityPteroPower"
+)
 public class VelocityPteroPower {
     private final String version = "0.9.3.1";
     private final String project = "1dDr5J4w";
