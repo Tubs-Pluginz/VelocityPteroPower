@@ -88,7 +88,7 @@ public class PlayerConnectionHandler {
         String serverId = serverInfo.getServerId();
 
         // 2. Check Player Cooldown for starting this specific server
-        if (isPlayerOnCooldown(player, serverName)) {
+        if (isPlayerOnCooldown(player, serverName) && event.getPreviousServer() != null) {
             event.setResult(ServerPreConnectEvent.ServerResult.denied());
             return; // Player is on cooldown for this action
         }
@@ -154,7 +154,7 @@ public class PlayerConnectionHandler {
     /** Handles the logic when a player tries to connect to an offline, managed server. */
     private void handleOfflineServerConnection(ServerPreConnectEvent event, Player player, String serverName, String serverId, PteroServerInfo serverInfo) {
         // 5. Check if server is already being started by someone else
-        if (startingServers.contains(serverName)) {
+        if (startingServers.contains(serverName) && event.getPreviousServer() != null) {
             player.sendMessage(
                 getPluginPrefix().append(
                     Component.text(
@@ -182,11 +182,13 @@ public class PlayerConnectionHandler {
         }
 
         // 7. Attempt to Start the Server
-        logger.info("Attempting to start server '{}' ({}) for player {}", serverName, serverId, player.getUsername());
-        startingServers.add(serverName);
-        playerCooldowns.put(player.getUniqueId(), System.currentTimeMillis()); // Apply cooldown *now*
-        apiClient.powerServer(serverId, PowerSignal.START); // Use Enum
-        scheduleInitialIdleCheck(serverName, serverId); // Schedule check in case player leaves queue
+        if (!startingServers.contains(serverName)) {
+            logger.info("Attempting to start server '{}' ({}) for player {}", serverName, serverId, player.getUsername());
+            startingServers.add(serverName);
+            playerCooldowns.put(player.getUniqueId(), System.currentTimeMillis()); // Apply cooldown *now*
+            apiClient.powerServer(serverId, PowerSignal.START); // Use Enum
+            scheduleInitialIdleCheck(serverName, serverId);
+        }// Schedule check in case player leaves queue
 
         // 8. Handle Player Redirection (Limbo or Disconnect)
         Optional<RegisteredServer> limboServerOpt = findValidLimboServer();
