@@ -189,29 +189,29 @@ public class ConfigurationManager {
         }
 
     private PanelType detectPanelType(String apiKey) {
-        if (apiKey == null) {
-            return PanelType.pterodactyl; // Plugin will be disabled
-        }
-        if (apiKey.startsWith("ptlc_")) {
-            return PanelType.pterodactyl;
-        } else if (apiKey.startsWith("plcn_")) {
-            return PanelType.pelican;
-        } else {
-            logger.warn(
-                "Unrecognized API Key prefix, defaulting to Pterodactyl."
-            );
+        if (apiKey == null || apiKey.isEmpty()) {
             return PanelType.pterodactyl;
         }
-    }
 
-    /**
-     * Checks if the plugin has a valid API key configuration.
-     *
-     * @return true if the API key is valid, false otherwise
-     */
-    public boolean hasValidApiKey() {
-        return apiKey != null && !apiKey.isEmpty() &&
-               (apiKey.startsWith("ptlc_") || apiKey.startsWith("peli_"));
+        String prefix = apiKey.split("_")[0];
+        return switch (prefix) {
+            case "ptlc" -> {
+                logger.debug("Detected pterodactyl panel from apiKey");
+                yield PanelType.pterodactyl;
+            }
+            case "plcn" -> {
+                logger.debug("Detected pelican panel from apiKey");
+                yield PanelType.pelican;
+            }
+            case "ptla", "peli" -> {
+                logger.debug("Detected Application Api Key please change this to a client key");
+                yield PanelType.error;
+            }
+            default -> {
+                logger.info("API Key has no recognized prefix, assuming mcServerSoft.");
+                yield PanelType.mcServerSoft;
+            }
+        };
     }
 
     /**

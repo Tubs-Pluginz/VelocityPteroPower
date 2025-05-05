@@ -3,6 +3,7 @@
  */
 package de.tubyoub.velocitypteropower.util;
 
+import de.tubyoub.velocitypteropower.api.PanelType;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 
@@ -40,16 +41,19 @@ public class RateLimitTracker {
      * @return {@code true} if a request can be made, {@code false} otherwise.
      */
     public boolean canMakeRequest() {
-        rateLimitLock.lock();
-        try {
-            boolean canMake = remainingRequests.get() > 0;
-            if (!canMake) {
-                logger.debug("API request blocked due to rate limiting ({} remaining).", remainingRequests.get());
+        if (!configurationManager.getPanelType().equals(PanelType.mcServerSoft)) {
+            rateLimitLock.lock();
+            try {
+                boolean canMake = remainingRequests.get() > 0;
+                if (!canMake) {
+                    logger.debug("API request blocked due to rate limiting ({} remaining).", remainingRequests.get());
+                }
+                return canMake;
+            } finally {
+                rateLimitLock.unlock();
             }
-            return canMake;
-        } finally {
-            rateLimitLock.unlock();
         }
+        return true;
     }
 
     /**

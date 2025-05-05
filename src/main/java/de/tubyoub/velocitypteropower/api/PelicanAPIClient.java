@@ -27,15 +27,7 @@ import java.util.concurrent.*;
  * NOTE: The current implementation is the same as the PterodactylAPIClient.
  * if Pelican changes the workings of their API, this class will be updated.
  */
-public class PelicanAPIClient implements PanelAPIClient {
-    public final FilteredComponentLogger logger;
-    public final ConfigurationManager configurationManager;
-    public final ProxyServer proxyServer;
-    private final VelocityPteroPower plugin;
-    public final RateLimitTracker rateLimitTracker;
-
-    private final HttpClient httpClient;
-    private final ExecutorService executorService;
+public class PelicanAPIClient extends AbstractPanelAPIClient {
 
     /**
      * Constructs a PelicanAPIClient.
@@ -43,16 +35,7 @@ public class PelicanAPIClient implements PanelAPIClient {
      * @param plugin The main VelocityPteroPower plugin instance.
      */
     public PelicanAPIClient(VelocityPteroPower plugin) {
-        this.plugin = plugin;
-        this.logger = plugin.getFilteredLogger();
-        this.configurationManager = plugin.getConfigurationManager();
-        this.proxyServer = plugin.getProxyServer();
-        this.rateLimitTracker = plugin.getRateLimitTracker();
-
-        this.executorService = Executors.newFixedThreadPool(10); // Limit to 10 threads
-        this.httpClient = HttpClient.newBuilder()
-                .executor(executorService)
-                .build();
+        super(plugin);
     }
 
     /**
@@ -114,68 +97,6 @@ public class PelicanAPIClient implements PanelAPIClient {
     }
 
     /**
-     * Checks server status using Velocity's built-in ping mechanism.
-     *
-     * @param serverName The name of the server registered in Velocity.
-     * @return True if the ping succeeds within the configured timeout, false otherwise.
-     */
-    private boolean checkOnlineViaVelocityPing(String serverName) {
-        Optional<RegisteredServer> serverOptional =
-            proxyServer.getServer(serverName);
-        if (serverOptional.isEmpty()) {
-            logger.debug(
-                "Cannot perform PING check: Server '{}' not registered in Velocity.",
-                serverName
-            );
-            return false; // Server not known to Velocity
-        }
-
-        RegisteredServer server = serverOptional.get();
-        try {
-            CompletableFuture<ServerPing> pingFuture = server.ping();
-            ServerPing pingResult = pingFuture.get(
-                configurationManager.getPingTimeout(),
-                TimeUnit.MILLISECONDS
-            );
-            boolean online = pingResult != null;
-            logger.debug(
-                "Ping check for {}: {}",
-                serverName,
-                online ? "Success" : "Failed (No result/Timeout)"
-            );
-            return online;
-        } catch (TimeoutException e) {
-            logger.debug(
-                "Ping check for {} timed out after {}ms.",
-                serverName,
-                configurationManager.getPingTimeout()
-            );
-            return false;
-        } catch (ExecutionException e) {
-            // Log the underlying cause if possible
-            Throwable cause = e.getCause();
-            logger.debug(
-                "Ping check for {} failed: {}",
-                serverName,
-                cause != null ? cause.getMessage() : e.getMessage()
-            );
-            return false;
-        } catch (InterruptedException e) {
-            logger.warn("Ping check for {} interrupted.", serverName);
-            Thread.currentThread().interrupt(); // Re-interrupt the thread
-            return false;
-        } catch (Exception e) { // Catch unexpected errors during ping
-            logger.warn(
-                "Unexpected error pinging server {}: {}",
-                serverName,
-                e.getMessage(),
-                e
-            );
-            return false;
-        }
-    }
-
-    /**
      * Checks server status by querying the Pelican API /resources endpoint.
      * Includes retry logic for specific HTTP/2 GOAWAY errors.
      *
@@ -183,7 +104,7 @@ public class PelicanAPIClient implements PanelAPIClient {
      * @param serverId   The Pelican server identifier (UUID).
      * @return True if the API reports the server state as "running", false otherwise.
      */
-    private boolean checkOnlineViaPanelApi(String serverName, String serverId) {
+    protected boolean checkOnlineViaPanelApi(String serverName, String serverId) {
         if (serverId == null || serverId.isBlank()) {
             logger.error(
                 "Cannot perform API check: Server ID is missing for server '{}'.",
@@ -319,19 +240,6 @@ public class PelicanAPIClient implements PanelAPIClient {
         return false;
     }
 
-    /**
-     * Checks if a server registered in Velocity has any players connected.
-     *
-     * @param serverName The name of the server as registered in Velocity.
-     * @return {@code true} if the server has no players or is not found, {@code false} otherwise.
-     */
-    @Override
-    public boolean isServerEmpty(String serverName) {
-        return proxyServer.getServer(serverName)
-            .map(server -> server.getPlayersConnected().isEmpty())
-            .orElse(true); // Treat non-existent server as empty
-    }
-
     public CompletableFuture<String> fetchWhitelistFile(String serverId) {
     CompletableFuture<String> future = new CompletableFuture<>();
 
@@ -369,11 +277,31 @@ public class PelicanAPIClient implements PanelAPIClient {
 
     return future;
 }
-
-    /**
-     * Shuts down the executor service used for API requests.
-     */
-    public void shutdown() {
-        executorService.shutdownNow();
+    public boolean isApiKeyValid(String apiKey) {
+        if (!rateLimitTracker.canMakeRequest()) {
+            logger.warn("Rate limit reached. Cannot check if ApiKey is valid}.");
+            return false;
+        }
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(configurationManager.getPterodactylUrl() + "api/client/"))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
+                .GET()
+                .build();
+            HttpResponse response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            rateLimitTracker.updateRateLimitInfo(response);
+            if (response.statusCode() == 401 || response.statusCode() == 403) {
+                logger.debug("Checking for valid ApiKey returned 401/403");
+                return false;
+            }else {
+                return true;
+            }
+        } catch (Exception e) {
+            logger.error("Error checking for valid ApiKey server.", e);
+        }
+        return false;
     }
+
 }

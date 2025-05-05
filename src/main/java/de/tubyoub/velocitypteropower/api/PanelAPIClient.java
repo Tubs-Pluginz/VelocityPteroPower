@@ -41,6 +41,12 @@ public interface PanelAPIClient {
      */
     CompletableFuture<String> fetchWhitelistFile(String serverId);
     /**
+    * Checks if the ApiKey is valid
+    * @param apiKey ApiKey which need to be checked if its valid
+     * @return {@code true} apiKey is considered valid {@code false} apiKey is considered invalid
+    */
+    boolean isApiKeyValid(String apiKey);
+    /**
      * Shuts down any resources used by the API client, such as thread pools.
      * Should be called when the plugin is disabled.
      */

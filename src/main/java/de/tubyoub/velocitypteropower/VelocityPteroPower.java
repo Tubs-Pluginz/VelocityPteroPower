@@ -11,10 +11,7 @@ import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
-import de.tubyoub.velocitypteropower.api.PanelAPIClient;
-import de.tubyoub.velocitypteropower.api.PanelType;
-import de.tubyoub.velocitypteropower.api.PelicanAPIClient;
-import de.tubyoub.velocitypteropower.api.PterodactylAPIClient;
+import de.tubyoub.velocitypteropower.api.*;
 import de.tubyoub.velocitypteropower.command.PteroCommand;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
 import de.tubyoub.velocitypteropower.manager.MessagesManager;
@@ -122,13 +119,6 @@ public class VelocityPteroPower {
         this.messagesManager = new MessagesManager(this);
         messagesManager.loadMessages();
 
-
-        // 2. Validate API Key
-        if (!configurationManager.hasValidApiKey()) {
-            logInvalidApiKeyError();
-            return; // Stop initialization
-        }
-
         // 3. Initialize Core Components
         this.rateLimitTracker = new RateLimitTracker(filteredLogger, configurationManager);
         this.updateService = new UpdateService(filteredLogger, configurationManager, VERSION, MODRINTH_PROJECT_ID);
@@ -137,9 +127,11 @@ public class VelocityPteroPower {
             filteredLogger.error("Failed to initialize Panel API Client. Plugin disabled.");
             return;
         }
-
-        whitelistManager.initialize();
-
+        if (!configurationManager.getPanelType().equals(PanelType.mcServerSoft)) {
+            whitelistManager.initialize();
+        }else {
+            filteredLogger.warn("Mc Server Soft does not support whitelist fetching... disabling whitelist checking...");
+        }
         // 4. Initialize Handlers/Managers/Listeners that depend on core components
         this.serverLifecycleManager = new ServerLifecycleManager(proxyServer,this);
         this.playerConnectionHandler = new PlayerConnectionHandler(proxyServer, this);
@@ -200,14 +192,10 @@ public class VelocityPteroPower {
              }
              initializeApiClient();
              if (apiClient == null) {
-                 filteredLogger.error("Failed to re-initialize Panel API Client after reload. Plugin may not function correctly.");
+                 filteredLogger.error("Failed to re-initialize Panel API Client after reload. Plugin will not function correctly.");
              }
              // Update API client reference in components that use it
              if (serverLifecycleManager != null) {
-                 // Need a setter or re-creation if API client is final in manager
-                 // For simplicity, let's assume re-creation or non-final field for now.
-                 // This highlights a complexity of splitting - managing dependency updates.
-                 // A better approach might use dependency injection frameworks.
                  filteredLogger.warn("API Client re-initialized. Dependent components might need restarting or updating.");
              }
              if (playerConnectionHandler != null) {
@@ -232,18 +220,29 @@ public class VelocityPteroPower {
     private void initializeApiClient() {
         PanelType type = configurationManager.getPanelType();
         filteredLogger.info("Initializing API client for panel type: {}", type);
-        // Ensure API key is valid before creating client
-        if (!configurationManager.hasValidApiKey()) {
-             logInvalidApiKeyError();
-             this.apiClient = null;
-             return;
-        }
 
-        if (type == PanelType.pelican) {
-            this.apiClient = new PelicanAPIClient(this);
-        } else { // Default to Pterodactyl
-            this.apiClient = new PterodactylAPIClient(this);
+        switch (type) {
+            case pterodactyl:
+                filteredLogger.debug("Detected Pterodactyl Panel, creating api client...");
+                this.apiClient = new PterodactylAPIClient(this);
+                break;
+            case pelican:
+                filteredLogger.debug("Detected Pelican Panel, creating api client...");
+                this.apiClient = new PelicanAPIClient(this);
+                break;
+            case mcServerSoft:
+                filteredLogger.debug("Detected Mc Server Soft Panel, creating api client...");
+                this.apiClient = new McServerSoftApiClient(this);
+                break;
+            default:
+                filteredLogger.debug("No Panel type specified. Defaulting to pterodactyl Api Client...");
+                this.apiClient = new PterodactylAPIClient(this);
+                break;
         }
+            if (!apiClient.isApiKeyValid(configurationManager.getPterodactylApiKey())) {
+                 logInvalidApiKeyError();
+                 this.apiClient = null;
+            }
     }
 
     /** Logs the plugin's startup banner. */
@@ -263,7 +262,7 @@ public class VelocityPteroPower {
          filteredLogger.error(" ");
          filteredLogger.error(" No valid API key found or configured in config.yml.");
          filteredLogger.error(" Please ensure 'pterodactyl.apiKey' is set correctly.");
-         filteredLogger.error(" Key should start with 'ptlc_' (Client) or 'peli_' (Pelican).");
+         filteredLogger.error(" Key should start with 'ptlc_' (Client) or 'plcn_' (Pelican).");
          filteredLogger.error(" Application API keys ('ptla_') are NOT supported.");
          filteredLogger.error(" ");
          filteredLogger.error(" Plugin will be disabled.");

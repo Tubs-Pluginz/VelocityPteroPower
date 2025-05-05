@@ -11,6 +11,7 @@ import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
 import de.tubyoub.velocitypteropower.api.PanelAPIClient;
+import de.tubyoub.velocitypteropower.api.PanelType;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
 import de.tubyoub.velocitypteropower.model.PteroServerInfo;
 import org.slf4j.Logger;
@@ -93,6 +94,9 @@ public class WhitelistManager {
      * Fetch whitelist for a specific server
      */
     private void fetchWhitelist(String serverName, String serverId) {
+        if (configManager.getPanelType().equals(PanelType.mcServerSoft)){
+            logger.warn("MC Server Soft does not support whitelist fetching");
+        }
         //logger.debug("Fetching whitelist for server {} with ID {}", serverName, serverId);
         apiClient.fetchWhitelistFile(serverId)
             .thenAccept(whitelistJson -> {
@@ -143,6 +147,9 @@ public class WhitelistManager {
      */
     public boolean isPlayerWhitelisted(String serverName, String playerName) {
         logger.debug("Checking if player {} is whitelisted on server {}", playerName, serverName);
+        if (configManager.getPanelType().equals(PanelType.mcServerSoft)){
+            return true;
+        }
         // If whitelist is not enabled for this server, consider everyone whitelisted
         PteroServerInfo serverInfo = plugin.getServerInfoMap().get(serverName);
         if (serverInfo == null || !serverInfo.isWhitelistEnabled()) {
