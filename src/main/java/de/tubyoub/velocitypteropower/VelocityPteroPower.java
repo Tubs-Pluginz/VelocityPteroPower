@@ -385,8 +385,8 @@ public class VelocityPteroPower {
 
         } else {
             // Disconnect player (Limbo not configured, not registered, offline, or rate limited)
-            logger.info("Disconnecting player {} while server '{}' starts (Limbo not available/usable).", player.getUsername(), serverName);
             if(event.getPreviousServer() == null){
+                logger.info("Disconnecting player {} while server '{}' starts (Limbo not available/usable).", player.getUsername(), serverName);
                  player.disconnect(
                         Component.text(messagesManager.getMessage("starting-server-disconnect")
                                 .replace("%server%", serverName), NamedTextColor.WHITE));
