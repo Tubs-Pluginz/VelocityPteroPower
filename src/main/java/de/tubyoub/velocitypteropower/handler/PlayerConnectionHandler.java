@@ -218,17 +218,36 @@ public class PlayerConnectionHandler {
             // Schedule task to check target server status and connect player later
             scheduleDelayedConnect(player, serverName, serverInfo);
         } else {
-            // Disconnect Player (No usable Limbo)
-            logger.info("Disconnecting player {} while server '{}' starts (Limbo not available/usable).", player.getUsername(), serverName);
-            player.disconnect(
-                Component.text(
-                    messagesManager.getMessage("starting-server-disconnect")
-                        .replace("%server%", serverName),
-                    NamedTextColor.WHITE
-                )
-            );
+            // No usable Limbo
+            if (event.getPreviousServer() == null) {
+                // Disconnect Player
+                logger.info("Disconnecting player {} while server '{}' starts (Limbo not available/usable).", player.getUsername(), serverName);
+                player.disconnect(
+                    Component.text(
+                        messagesManager.getMessage("starting-server-disconnect")
+                            .replace("%server%", serverName),
+                        NamedTextColor.WHITE
+                    )
+                );
+
+                // No need to schedule connect task if player is disconnected
+            } else {
+                // Keep Player connected
+                player.sendMessage(
+                    getPluginPrefix().append(
+                        Component.text(
+                            messagesManager.getMessage("starting-server-disconnect")
+                                .replace("%server%", serverName),
+                            NamedTextColor.AQUA
+                        )
+                    )
+                );
+
+                // Schedule task to check target server status and connect player later
+                scheduleDelayedConnect(player, serverName, serverInfo);
+            }
+
             event.setResult(ServerPreConnectEvent.ServerResult.denied());
-            // No need to schedule connect task if player is disconnected
         }
     }
 
