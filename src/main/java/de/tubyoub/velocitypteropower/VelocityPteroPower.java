@@ -47,8 +47,8 @@ import java.util.concurrent.ConcurrentHashMap;
     name = "VelocityPteroPower",
     version = "0.9.4",
     authors = {"TubYoub"},
-    description = "Manage Pterodactyl/Pelican servers via Velocity.",
-    url = "https://github.com/BT-Pluginz/VelocityPteroPower"
+    description = "Manage Pterodactyl/Pelican/Mc Server Soft servers via Velocity.",
+    url = "https://github.com/Tubs-Pluginz/VelocityPteroPower"
 )
 public class VelocityPteroPower {
     // Plugin constants
@@ -283,7 +283,6 @@ public class VelocityPteroPower {
     }
 
     // --- Getters for Core Components and State ---
-    // These allow other classes (like commands) to access necessary parts
 
     public ProxyServer getProxyServer() {
         return proxyServer;

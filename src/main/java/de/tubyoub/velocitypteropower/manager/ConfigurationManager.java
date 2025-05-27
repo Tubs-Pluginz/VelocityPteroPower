@@ -190,7 +190,7 @@ public class ConfigurationManager {
 
     private PanelType detectPanelType(String apiKey) {
         if (apiKey == null || apiKey.isEmpty()) {
-            return PanelType.pterodactyl;
+          return PanelType.pterodactyl;
         }
 
         String prefix = apiKey.split("_")[0];

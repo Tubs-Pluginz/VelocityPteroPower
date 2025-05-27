@@ -7,6 +7,7 @@
     <groupId>de.tubyoub</groupId>
     <artifactId>VelocityPteroPower</artifactId>
     <version>0.9.4</version>
+
     <packaging>jar</packaging>
 
     <name>VelocityPteroPower</name>
