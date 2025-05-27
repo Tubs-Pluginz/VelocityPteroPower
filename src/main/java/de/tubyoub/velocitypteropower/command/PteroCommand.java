@@ -1,35 +1,19 @@
 /*
  * This file is part of VelocityPteroPower, licensed under the MIT License.
- *
- *  Copyright (c) TubYoub <github@tubyoub.de>
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in all
- *  copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
  */
-
-package de.tubyoub.velocitypteropower;
+package de.tubyoub.velocitypteropower.command;
 
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
+import de.tubyoub.velocitypteropower.api.PanelType;
+import de.tubyoub.velocitypteropower.api.PowerSignal;
+import de.tubyoub.velocitypteropower.model.PteroServerInfo;
+import de.tubyoub.velocitypteropower.VelocityPteroPower;
 import de.tubyoub.velocitypteropower.api.PanelAPIClient;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
+import de.tubyoub.velocitypteropower.util.RateLimitTracker;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -47,6 +31,7 @@ public class PteroCommand implements SimpleCommand {
     private final VelocityPteroPower plugin;
     private final Logger logger;
     private final PanelAPIClient apiClient;
+    public final RateLimitTracker rateLimitTracker;
     private final ConfigurationManager configurationManager;
     private final Map<UUID, Long> pendingForceStopConfirmations = new HashMap<>();
     private static final long CONFIRMATION_TIMEOUT_MS = 30000; // 30 seconds
@@ -59,8 +44,9 @@ public class PteroCommand implements SimpleCommand {
     public PteroCommand(VelocityPteroPower plugin) {
         this.plugin = plugin;
         this.proxyServer = plugin.getProxyServer();
-        this.logger = plugin.getLogger();
-        this.apiClient = plugin.getAPIClient();
+        this.logger = plugin.getFilteredLogger();
+        this.apiClient = plugin.getApiClient();
+        this.rateLimitTracker = plugin.getRateLimitTracker();
         this.configurationManager = plugin.getConfigurationManager();
     }
 
@@ -88,21 +74,21 @@ public class PteroCommand implements SimpleCommand {
                 if (sender.hasPermission("ptero.start")) {
                     startServer(invocation.source(), args);
                 } else {
-                    sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"),TextColor.color(255,0,0))));
+                    sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"), TextColor.color(255, 0, 0))));
                 }
                 break;
             case "stop":
                 if (sender.hasPermission("ptero.stop")) {
                     stopServer(sender, args);
                 } else {
-                    sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"),TextColor.color(255,0,0))));
+                    sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"), TextColor.color(255, 0, 0))));
                 }
                 break;
             case "reload":
                 if (sender.hasPermission("ptero.reload")) {
                     reloadConfig(sender);
                 } else {
-                    sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"),TextColor.color(255,0,0))));
+                    sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"), TextColor.color(255, 0, 0))));
                 }
                 break;
             case "restart":
@@ -112,9 +98,20 @@ public class PteroCommand implements SimpleCommand {
                     sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"), TextColor.color(255, 0, 0))));
                 }
                 break;
-            case "stopidle", "stopIdle":
+            case "stopidle":
                 if (sender.hasPermission("ptero.stopIdle")) {
                     stopIdleServers(sender);
+                } else {
+                    sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"), TextColor.color(255, 0, 0))));
+                }
+                break;
+            case "reloadwhitelist":
+                if (configurationManager.getPanelType() == PanelType.mcServerSoft){
+                    sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("mcss-not-supported"), TextColor.color(255, 0, 0))));
+                    break;
+                }
+                if (sender.hasPermission("ptero.whitelistReload")) {
+                    plugin.getWhitelistManager().updateAllWhitelists();
                 } else {
                     sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"), TextColor.color(255, 0, 0))));
                 }
@@ -185,8 +182,8 @@ public class PteroCommand implements SimpleCommand {
                     continue;
                 }
 
-                if (plugin.canMakeRequest()) {
-                    apiClient.powerServer(serverInfo.getServerId(), "stop");
+                if (rateLimitTracker.canMakeRequest()) {
+                    apiClient.powerServer(serverInfo.getServerId(), PowerSignal.STOP);
                     stoppedCount++;
                 } else {
                     sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("rate-limit-exceeded"), NamedTextColor.RED)));
@@ -213,8 +210,8 @@ public class PteroCommand implements SimpleCommand {
                 String serverName = entry.getKey();
                 PteroServerInfo serverInfo = entry.getValue();
 
-                if (plugin.canMakeRequest()) {
-                    apiClient.powerServer(serverInfo.getServerId(), "stop");
+                if (rateLimitTracker.canMakeRequest()) {
+                    apiClient.powerServer(serverInfo.getServerId(), PowerSignal.STOP);
                     stoppedCount++;
                 } else {
                     sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("rate-limit-exceeded"), NamedTextColor.RED)));
@@ -246,8 +243,8 @@ public class PteroCommand implements SimpleCommand {
         Map<String, PteroServerInfo> serverInfoMap = plugin.getServerInfoMap();
         if (serverInfoMap.containsKey(serverName)) {
             PteroServerInfo serverInfo = serverInfoMap.get(serverName);
-            if (plugin.canMakeRequest()) {
-                apiClient.powerServer(serverInfo.getServerId(), "start");
+            if (rateLimitTracker.canMakeRequest()) {
+                apiClient.powerServer(serverInfo.getServerId(), PowerSignal.START);
             }
             sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("starting-server").replace("%server%", serverName))));
         } else {
@@ -269,8 +266,8 @@ public class PteroCommand implements SimpleCommand {
         Map<String, PteroServerInfo> serverInfoMap = plugin.getServerInfoMap();
         if (serverInfoMap.containsKey(serverName)) {
             PteroServerInfo serverInfo = serverInfoMap.get(serverName);
-            if (plugin.canMakeRequest()) {
-                apiClient.powerServer(serverInfo.getServerId(), "stop");
+            if (rateLimitTracker.canMakeRequest()) {
+                apiClient.powerServer(serverInfo.getServerId(), PowerSignal.STOP);
             }
             sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("server-shutting-down").replace("%server%", serverName))));
         } else {
@@ -286,8 +283,8 @@ public class PteroCommand implements SimpleCommand {
         Map<String, PteroServerInfo> serverInfoMap = plugin.getServerInfoMap();
         if (serverInfoMap.containsKey(serverName)) {
             PteroServerInfo serverInfo = serverInfoMap.get(serverName);
-            if (plugin.canMakeRequest()) {
-                apiClient.powerServer(serverInfo.getServerId(), "restart");
+            if (rateLimitTracker.canMakeRequest()) {
+                apiClient.powerServer(serverInfo.getServerId(), PowerSignal.RESTART);
             }
             sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("server-restarting").replace("%server%", serverName))));
         }
@@ -299,7 +296,7 @@ public class PteroCommand implements SimpleCommand {
      * @param sender the player who executed the command
      */
     private void reloadConfig(CommandSource sender) {
-        plugin.reloadConfig();
+        plugin.reload();
         sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("config-reload"),TextColor.color(0,255,0))));
     }
 
@@ -317,10 +314,11 @@ public class PteroCommand implements SimpleCommand {
             List<String> suggestions = new ArrayList<>();
             suggestions.add("start");
             suggestions.add("stop");
-            suggestions.add("stopidle");
-            suggestions.add("forcestopall");
             suggestions.add("restart");
+            suggestions.add("stopidle");
+            suggestions.add("whitelistReload");
             suggestions.add("reload");
+            suggestions.add("forcestopall");
             return suggestions;
         } else if (currentArgs.length == 2) {
             String subCommand = currentArgs[0].toLowerCase();
@@ -343,6 +341,7 @@ public class PteroCommand implements SimpleCommand {
         sender.sendMessage(plugin.getPluginPrefix().append(Component.text("/ptero stop <serverName>", TextColor.color(66,135,245))));
         sender.sendMessage(plugin.getPluginPrefix().append(Component.text("/ptero stopidle", TextColor.color(66,135,245))));
         sender.sendMessage(plugin.getPluginPrefix().append(Component.text("/ptero forcestopall", TextColor.color(66,135,245))));
+        sender.sendMessage(plugin.getPluginPrefix().append(Component.text("/ptero whitelistReload", TextColor.color(66,135,245))));
         sender.sendMessage(plugin.getPluginPrefix().append(Component.text("/ptero reload", TextColor.color(66,135,245))));
         sender.sendMessage(plugin.getPluginPrefix().append(Component.text("/ptero help", TextColor.color(66,135,245))));
     }

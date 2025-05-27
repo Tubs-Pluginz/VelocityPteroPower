@@ -1,30 +1,9 @@
 /*
  * This file is part of VelocityPteroPower, licensed under the MIT License.
- *
- *  Copyright (c) TubYoub <github@tubyoub.de>
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in all
- *  copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
  */
-
 package de.tubyoub.velocitypteropower.manager;
 
-import de.tubyoub.velocitypteropower.PteroServerInfo;
+import de.tubyoub.velocitypteropower.model.PteroServerInfo;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
 import de.tubyoub.velocitypteropower.api.PanelType;
 import dev.dejvokep.boostedyaml.YamlDocument;
@@ -65,6 +44,7 @@ public class ConfigurationManager {
     private boolean checkUpdate;
     private boolean printRateLimit;
     private boolean serverNotFoundMessage;
+    private boolean whitelistAllowBypass;
     private int loggerLevel;
     private int apiThreads;
     private int pingTimeout;
@@ -73,6 +53,7 @@ public class ConfigurationManager {
     private int idleStartShutdownTime;
     private int playerCommandCooldown;
     private int startupInitialCheckDelay;
+    private int whitelistCheckInterval;
     private ServerCheckMethod serverCheckMethod;
     private List<String> stopAllIgnoreList;
     private final VelocityPteroPower plugin;
@@ -86,7 +67,7 @@ public class ConfigurationManager {
      */
     public ConfigurationManager(VelocityPteroPower plugin) {
         this.plugin = plugin;
-        this.logger = plugin.getLogger();
+        this.logger = plugin.getFilteredLogger();
         this.dataDirectory = plugin.getDataDirectory();
     }
 
@@ -109,12 +90,15 @@ public class ConfigurationManager {
                                         .addIgnoredRoute("5", "servers", '.')
                                         .addIgnoredRoute("6", "servers", '.')
                                         .addIgnoredRoute("7", "servers", '.')
+                                        .addIgnoredRoute("8", "servers", '.')
                                         .build());
 
 
             checkUpdate = (boolean) config.get("checkUpdate", true);
             printRateLimit = (boolean) config.get("printRateLimit", false);
             serverNotFoundMessage = (boolean) config.get("serverNotFoundMessage", false);
+            whitelistAllowBypass = (boolean) config.get("whitelistAllowBypass", true);
+
             loggerLevel = (int) config.get("loggerLevel", 20);
             pingTimeout = (int) config.get("pingTimeout", 1000);
             apiThreads = (int) config.get("apiThreads", 10);
@@ -123,6 +107,8 @@ public class ConfigurationManager {
             idleStartShutdownTime = (int) config.get("idleStartShutdownTime", 300);
             playerCommandCooldown = (int) config.get("playerCommandCooldown", 10);
             startupInitialCheckDelay = (int) config.get("startupInitialCheckDelay", 10);
+            whitelistCheckInterval = (int) config.get("whitelistCheckInterval", 10);
+
             limboServer = (String) config.get("limboServer", "changeMe");
             stopAllIgnoreList = config.getStringList("stopIdleIgnore");
 
@@ -190,7 +176,8 @@ public class ConfigurationManager {
                         if (!Objects.equals(id, "1234abcd")){
                             int timeout = (int) serverInfoData.getOrDefault("timeout", -1);
                             int startupJoinDelay = (int) serverInfoData.getOrDefault("startupJoinDelay", 10);
-                            serverInfoMap.put(key, new PteroServerInfo(id, timeout, startupJoinDelay));
+                            boolean whitelist = (boolean) serverInfoData.getOrDefault("whitelist", false);
+                            serverInfoMap.put(key, new PteroServerInfo(id, timeout, startupJoinDelay, whitelist));
                             logger.info("Registered Server: " + id + " successfully");
                         }
                     } catch (Exception e) {
@@ -202,29 +189,29 @@ public class ConfigurationManager {
         }
 
     private PanelType detectPanelType(String apiKey) {
-        if (apiKey == null) {
-            return PanelType.pterodactyl; // Plugin will be disabled
+        if (apiKey == null || apiKey.isEmpty()) {
+          return PanelType.pterodactyl;
         }
-        if (apiKey.startsWith("ptlc_")) {
-            return PanelType.pterodactyl;
-        } else if (apiKey.startsWith("plcn_ ")) {
-            return PanelType.pelican;
-        } else {
-            logger.warn(
-                "Unrecognized API Key prefix, defaulting to Pterodactyl."
-            );
-            return PanelType.pterodactyl;
-        }
-    }
 
-    /**
-     * Checks if the plugin has a valid API key configuration.
-     *
-     * @return true if the API key is valid, false otherwise
-     */
-    public boolean hasValidApiKey() {
-        return apiKey != null && !apiKey.isEmpty() &&
-               (apiKey.startsWith("ptlc_") || apiKey.startsWith("plcn_ "));
+        String prefix = apiKey.split("_")[0];
+        return switch (prefix) {
+            case "ptlc" -> {
+                logger.debug("Detected pterodactyl panel from apiKey");
+                yield PanelType.pterodactyl;
+            }
+            case "plcn" -> {
+                logger.debug("Detected pelican panel from apiKey");
+                yield PanelType.pelican;
+            }
+            case "ptla", "peli" -> {
+                logger.debug("Detected Application Api Key please change this to a client key");
+                yield PanelType.error;
+            }
+            default -> {
+                logger.info("API Key has no recognized prefix, assuming mcServerSoft.");
+                yield PanelType.mcServerSoft;
+            }
+        };
     }
 
     /**
@@ -262,8 +249,13 @@ public class ConfigurationManager {
     public boolean isCheckUpdate() {
         return checkUpdate;
     }
+
     public boolean isServerNotFoundMessage() {
         return serverNotFoundMessage;
+    }
+
+    public boolean isWhitelistAllowBypass() {
+        return whitelistAllowBypass;
     }
 
     public PanelType getPanelType(){
@@ -299,7 +291,7 @@ public class ConfigurationManager {
         return shutdownRetryDelay;
     }
 
-    public int getPlayerCommandCooldown(){
+    public int getPlayerCommandCooldown() {
         return playerCommandCooldown;
     }
     public int getIdleStartShutdownTime(){
@@ -308,6 +300,10 @@ public class ConfigurationManager {
 
     public  int getStartupInitialCheckDelay(){
         return startupInitialCheckDelay;
+    }
+
+    public int getWhitelistCheckInterval(){
+        return whitelistCheckInterval;
     }
 
     public String getLimboServerName() {

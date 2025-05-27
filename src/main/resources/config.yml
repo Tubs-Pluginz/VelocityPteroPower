@@ -4,7 +4,7 @@
 ################################
 
 # Version of the configuration file
-fileversion: 7
+fileversion: 8
 
 # Check for updates
 # If true, the plugin will check for updates on startup.
@@ -90,7 +90,16 @@ stopIdleIgnore:
 # default: false
 serverNotFoundMessage: false
 
-# Pterodactyl configuration
+# Allow players with the permission "ptero.bypass" to bypass the whitelist when starting a server.
+# This does not work to get around a whitelist because it is enforced by the backend server itself.
+# default: true
+whitelistAllowBypass: true
+
+# How long (in minutes) VPP should wait in between checks for a new whitelist and enforce it (if enabled)
+# default: 10
+whitelistCheckInterval: 10
+
+# Panel configuration
 pterodactyl:
   # The URL of your pterodactyl panel
   # If you use Cloudflare Tunnel, you need to allow the ip in the bypass setting.
@@ -110,6 +119,7 @@ servers:
     # Panel server ID
     # You can find the Panel server ID in the URL of the server page.
     # For example, if the URL is https://panel.example.com/server/1234abcd, the server ID is 1234abcd.
+    # For Pelican, you need the short UUID from Server Details.
 
     id: 1234abcd
 
@@ -122,3 +132,7 @@ servers:
     # The time (in seconds) VPP should wait before automatically connecting a player after a server successfully started.
     # For example when you have a plugin that needs a few seconds to fully load.... or smth else.
     startupJoinDelay: 10
+
+    # If VPP should fetch the whitelist of the Server and enforce it when a player trys to start a server
+    # default: false
+    whitelist: false

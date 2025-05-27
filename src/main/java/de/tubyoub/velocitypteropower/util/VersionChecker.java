@@ -1,28 +1,6 @@
 /*
  * This file is part of VelocityPteroPower, licensed under the MIT License.
- *
- *  Copyright (c) TubYoub <github@tubyoub.de>
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
- *  furnished to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in all
- *  copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
  */
-
-
 package de.tubyoub.velocitypteropower.util;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -69,7 +47,7 @@ public class VersionChecker {
                         String changelog = (String) latestVersion.get("changelog");
                         String versionType = (String) latestVersion.get("version_type");
 
-                        if (!latestVersionNumber.equals(version)) {
+                        if (compareVersions(latestVersionNumber, version) > 0) {
                             UpdateUrgency urgency = determineUrgency(changelog, versionType);
                             return new VersionInfo(true, latestVersionNumber, changelog, urgency);
                         } else {
@@ -133,5 +111,29 @@ public class VersionChecker {
             e.printStackTrace();
             return Arrays.asList(); // Handle parsing exception
         }
+    }
+
+    /**
+     * Compares two version strings.
+     * @param version1 The first version string.
+     * @param version2 The second version string.
+     * @return A positive number if version1 is newer, 0 if they are equal, and a negative number if version2 is newer.
+     */
+    private static int compareVersions(String version1, String version2) {
+        String[] parts1 = version1.split("\\.");
+        String[] parts2 = version2.split("\\.");
+
+        int length = Math.max(parts1.length, parts2.length);
+
+        for (int i = 0; i < length; i++) {
+            int v1 = i < parts1.length ? Integer.parseInt(parts1[i]) : 0;
+            int v2 = i < parts2.length ? Integer.parseInt(parts2[i]) : 0;
+
+            if (v1 != v2) {
+                return v1 - v2;
+            }
+        }
+
+        return 0;
     }
 }

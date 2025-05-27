@@ -21,6 +21,7 @@ config-reload: "Configuration reloaded"
 available-commands-helpcommand: "Available commands:"
 server-not-found: "Server not found in configuration: %server%"
 cooldown-active: "You are on cooldown. Please wait %timeout% seconds before starting another server."
+mcss-not-supported: "Mc Server Soft does not support this command"
 #stopall
 stopping-all-servers: "Stopping all %count% servers. This may take some time." # %count% is replaced with the number of servers
 no-servers-found: "No servers found in configuration to stop."

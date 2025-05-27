@@ -34,6 +34,7 @@ This Project is a port of the [BungeePteroPower](https://github.com/Kamesuta/Bun
 - `ptero.start` Permission for the `/ptero start` command
 - `ptero.stop`Permission for the `/ptero stop` command
 - `ptero.restart` Permission for the `/ptero restart` command
+- `ptero.whitelistReload` Permission for the `/ptero whitelistReload` command
 - `ptero.reload` Permission for the `/ptero reload` command
 - `ptero.stopIdle` Permission for the `/ptero stopIdle` command
 - `ptero.forcestopall` Permission for the `/ptero forcestopall` command
@@ -87,7 +88,7 @@ printRateLimit: false
 #                    More accurate for actual server state ("running"), but uses API
 #                    requests and counts towards rate limits.
 # Default: "VELOCITY_PING"
-serverStatusCheckMethod: "VELOCITY_PING"
+serverStatusCheckMethod: "PANEL_API"
 
 # How long the ping to the server lasts, to check if its is online, until it times out (in milliseconds)
 # default: 1000 (1 second)
@@ -113,7 +114,7 @@ playerStartCooldown: 10
 # Server Name from your limbo
 # should be a configured server so it can be automatically started
 # changeMe = not configured so limbo server won't be used
-limboServer: changeMe
+limboServer: limbo
 
 # How long (in seconds) the plugin should wait for the first check if the server is online
 # The joinDelay (configured for each server) is still applied when the server is online before a
@@ -135,6 +136,15 @@ stopIdleIgnore:
 # default: false
 serverNotFoundMessage: false
 
+# Allow players with the permission "ptero.bypass" to bypass the whitelist when starting a server.
+# This does not work to get around a whitelist because it is enforced by the backend server itself.
+# default: true
+whitelistAllowBypass: false
+
+# How long (in minutes) VPP should wait in between checks for a new whitelist and enforce it (if enabled)
+# default: 10
+whitelistCheckInterval: 10
+
 # Pterodactyl configuration
 pterodactyl:
   # The URL of your pterodactyl panel
@@ -142,6 +152,7 @@ pterodactyl:
   url: http://192.168.178.74:2462/
   # The client api key of your pterodactyl panel. It starts with "ptlc_".
   # You can find the client api key in the "API Credentials" tab of the "Account" page.
+  # For Pelican, you need the short UUID from Server Details.
   apiKey: ptlc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 # Per server configuration
@@ -160,15 +171,26 @@ servers:
     # If you set it to 0, the server will be stopped immediately after the last player leaves.
 
     timeout: -1
+    
+    # If VPP should fetch the whitelist of the Server and enforce it when a player trys to start a server
+    # default: false
+    whitelist: false
   test:
     id: abcd1234
     timeout: 5
+    whitelist: true
   mc-purpur-1:
     id: ab12cd34
     timeout: 180
+    whitelist: false
   mcforge1:
     id: 1111abcd
     timeout: -1
+    whitelist: false
+  limbo:
+    id: 9999abcd
+    timeout: -1
+    whitelist: false
 
 ```
 
