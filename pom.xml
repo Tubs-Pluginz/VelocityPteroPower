@@ -22,7 +22,7 @@
 
     <profiles>
         <profile>
-            <id>alpha</id>
+            <id>beta</id>
             <build>
                 <resources>
                   <resource>
