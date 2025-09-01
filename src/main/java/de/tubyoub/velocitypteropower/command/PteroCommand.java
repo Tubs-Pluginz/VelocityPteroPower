@@ -105,7 +105,7 @@ public class PteroCommand implements SimpleCommand {
                     sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("no-permission"), TextColor.color(255, 0, 0))));
                 }
                 break;
-            case "reloadwhitelist":
+            case "whitelistreload":
                 if (configurationManager.getPanelType() == PanelType.mcServerSoft){
                     sender.sendMessage(plugin.getPluginPrefix().append(Component.text(plugin.getMessagesManager().getMessage("mcss-not-supported"), TextColor.color(255, 0, 0))));
                     break;
