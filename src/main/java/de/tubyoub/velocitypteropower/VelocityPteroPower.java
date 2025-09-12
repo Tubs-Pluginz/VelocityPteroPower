@@ -45,14 +45,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Plugin(
     id = "velocity-ptero-power",
     name = "VelocityPteroPower",
-    version = "0.9.4",
+    version = "0.9.5",
     authors = {"TubYoub"},
     description = "Manage Pterodactyl/Pelican/Mc Server Soft servers via Velocity.",
     url = "https://github.com/Tubs-Pluginz/VelocityPteroPower"
 )
 public class VelocityPteroPower {
     // Plugin constants
-    private static final String VERSION = "0.9.4";
+    private static final String VERSION = "0.9.5";
     private static final String MODRINTH_PROJECT_ID = "1dDr5J4w";
     private static final int BSTATS_PLUGIN_ID = 21465;
 
