@@ -11,6 +11,12 @@ fileversion: 8
 # If a new version is available, a message will be sent to the console and to players with the permission "ptero.reload".
 checkUpdate: true
 
+# Override the language used for plugin messages.
+# Set to a locale like "en_US" or "de_DE" to force a specific language.
+# Use "auto" to follow the environment (system/Velocity) language.
+# default: auto
+languageOverride: auto
+
 # Choose which logging level should be used
 # It depends on how much you want you're console to be filled with information from VPP
 # For production you can safely set it to a higher level but for development/testing it is recommended to use a lower level

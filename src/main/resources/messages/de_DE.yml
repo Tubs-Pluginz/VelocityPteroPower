@@ -1,0 +1,45 @@
+# VelocityPteroPower Nachrichten - Deutsch (DE)
+fileversion: 1
+
+prefix: "&8[&bVPP&8]"
+
+generic:
+  success: "&aErfolg: {message}"
+  error: "&cFehler: {message}"
+  reload-success: "{prefix} &aKonfiguration und Nachrichten neu geladen."
+  reload-failed: "{prefix} &cNeuladen fehlgeschlagen. Siehe Konsole."
+
+command:
+  no-permission: "{prefix} &cDu hast keine Berechtigung für diesen Befehl."
+  player-only: "{prefix} &cNur Spieler können diesen Befehl verwenden."
+  console-only: "{prefix} &cNur die Konsole kann diesen Befehl verwenden."
+  usage: "{prefix} &7Benutzung: &e/{usage}"
+  unknown-subcommand: "{prefix} &cUnbekannter Unterbefehl: &e{sub}"
+  mcss-not-supported: "{prefix} &cMc Server Soft unterstützt diesen Befehl nicht."
+  no-servers-found: "{prefix} &cKeine Server in der Konfiguration zum Stoppen gefunden."
+  rate-limit-exceeded: "{prefix} &cAPI-Rate-Limit überschritten. Nicht alle Server konnten gestoppt werden."
+  stopping-all-servers: "{prefix} &7Stoppe alle &e{count}&7 Server. Dies kann einige Zeit dauern."
+  force-stopping-all-servers: "{prefix} &7Erzwinge das Stoppen aller &e{count}&7 Server. Dies kann einige Zeit dauern."
+  cooldown-active: "{prefix} &eDu hast eine Abklingzeit. Bitte warte {timeout} Sekunden, bevor du es erneut versuchst."
+
+connect:
+  unmanaged-server: "{prefix} &cServer nicht in der Konfiguration gefunden: {server}"
+  server-starting: "{prefix} &eServer '{server}' startet bereits."
+  error-rate-limited: "{prefix} &cServerstart verzögert sich aufgrund von API-Limits. Bitte warte oder versuche es später erneut."
+  redirecting-to-limbo: "{prefix} &7Server '{server}' startet. Du wirst zu {limbo} gesendet..."
+  starting-server-disconnect: "{prefix} &7Server '{server}' startet. Bitte versuche es in einem Moment erneut."
+  start-timeout: "{prefix} &cServer '{server}' ist nicht rechtzeitig gestartet."
+  target-server-not-found: "{prefix} &cZielserver '{server}' ist nicht verfügbar."
+  not-whitelisted: "{prefix} &cDu bist auf diesem Server nicht auf der Whitelist."
+
+server:
+  starting: "{prefix} &7Server startet..."
+  started: "{prefix} &aServer gestartet."
+  stopping: "{prefix} &7Server wird gestoppt..."
+  stopped: "{prefix} &cServer gestoppt."
+  idle-shutdown: "{prefix} &7Server {server} wurde heruntergefahren, da niemand beigetreten ist"
+
+power:
+  action-sent: "{prefix} &7Sende Energieaktion '&e{action}&7' an Server '&e{server}&7'."
+  action-failed: "{prefix} &cEnergieaktion '&e{action}&c' auf Server '&e{server}&c' fehlgeschlagen: &7{reason}"
+  status: "{prefix} &7Status von Server '&e{server}&7': &e{status}"

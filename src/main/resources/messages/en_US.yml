@@ -1,0 +1,46 @@
+# VelocityPteroPower messages - English (US)
+# You can copy this file to another language code (e.g., de_DE.yml) and translate.
+fileversion: 1
+
+prefix: "&8[&bVPP&8]"
+
+generic:
+  success: "&aSuccess: {message}"
+  error: "&cError: {message}"
+  reload-success: "{prefix} &aConfiguration and messages reloaded."
+  reload-failed: "{prefix} &cFailed to reload. Check console."
+
+command:
+  no-permission: "{prefix} &cYou do not have permission to perform this command."
+  player-only: "{prefix} &cOnly players can use this command."
+  console-only: "{prefix} &cOnly the console can use this command."
+  usage: "{prefix} &7Usage: &e/{usage}"
+  unknown-subcommand: "{prefix} &cUnknown subcommand: &e{sub}"
+  mcss-not-supported: "{prefix} &cMc Server Soft does not support this command."
+  no-servers-found: "{prefix} &cNo servers found in configuration to stop."
+  rate-limit-exceeded: "{prefix} &cAPI rate limit exceeded. Not all servers could be stopped."
+  stopping-all-servers: "{prefix} &7Stopping all &e{count}&7 servers. This may take some time."
+  force-stopping-all-servers: "{prefix} &7Force-stopping all &e{count}&7 servers. This may take some time."
+  cooldown-active: "{prefix} &eYou are on cooldown. Please wait {timeout} seconds before trying again."
+
+connect:
+  unmanaged-server: "{prefix} &cServer not found in configuration: {server}"
+  server-starting: "{prefix} &eServer '{server}' is already starting."
+  error-rate-limited: "{prefix} &cServer startup is delayed due to API limits. Please wait or try again later."
+  redirecting-to-limbo: "{prefix} &7Server '{server}' is starting. Sending you to {limbo}..."
+  starting-server-disconnect: "{prefix} &7Server '{server}' is starting up. Please try connecting again in a moment."
+  start-timeout: "{prefix} &cServer '{server}' did not start in time."
+  target-server-not-found: "{prefix} &cTarget server '{server}' is not available."
+  not-whitelisted: "{prefix} &cYou are not whitelisted on this server."
+
+server:
+  starting: "{prefix} &7Server is starting..."
+  started: "{prefix} &aServer started."
+  stopping: "{prefix} &7Server is stopping..."
+  stopped: "{prefix} &cServer stopped."
+  idle-shutdown: "{prefix} &7Server {server} has been shutdown because no one joined it"
+
+power:
+  action-sent: "{prefix} &7Sent power action '&e{action}&7' to server '&e{server}&7'."
+  action-failed: "{prefix} &cFailed to execute power action '&e{action}&c' on server '&e{server}&c': &7{reason}"
+  status: "{prefix} &7Server '&e{server}&7' status: &e{status}"

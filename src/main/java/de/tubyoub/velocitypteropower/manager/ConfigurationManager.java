@@ -45,6 +45,7 @@ public class ConfigurationManager {
     private boolean printRateLimit;
     private boolean serverNotFoundMessage;
     private boolean whitelistAllowBypass;
+    private String languageOverride;
     private int loggerLevel;
     private int apiThreads;
     private int pingTimeout;
@@ -98,6 +99,7 @@ public class ConfigurationManager {
             printRateLimit = (boolean) config.get("printRateLimit", false);
             serverNotFoundMessage = (boolean) config.get("serverNotFoundMessage", false);
             whitelistAllowBypass = (boolean) config.get("whitelistAllowBypass", true);
+            languageOverride = config.getString("languageOverride", "auto");
 
             loggerLevel = (int) config.get("loggerLevel", 20);
             pingTimeout = (int) config.get("pingTimeout", 1000);
@@ -277,6 +279,10 @@ public class ConfigurationManager {
 
     public boolean isPrintRateLimit() {
         return printRateLimit;
+    }
+
+    public String getLanguageOverride() {
+        return languageOverride;
     }
 
     public int getPingTimeout() {
