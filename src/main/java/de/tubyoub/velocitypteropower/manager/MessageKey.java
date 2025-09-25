@@ -43,6 +43,12 @@ public enum MessageKey {
     SERVER_STOPPING("server.stopping"),
     SERVER_STOPPED("server.stopped"),
     SERVER_IDLE_SHUTDOWN("server.idle-shutdown"),
+    SERVER_SHUTDOWN_SCHEDULED("server.shutdown-scheduled"),
+    SERVER_SHUTDOWN_CANCELLED_PLAYERS("server.shutdown-cancelled-players"),
+    SERVER_SHUTDOWN_CANCELLED("server.shutdown-cancelled"),
+    SERVER_SHUTDOWN_SUCCESS("server.shutdown-success"),
+    SERVER_SHUTDOWN_FAILED("server.shutdown-failed"),
+    SERVER_STILL_ONLINE_RETRYING("server.still-online-retrying"),
 
     // Pterodactyl/Power actions (example keys)
     POWER_ACTION_SENT("power.action-sent"),
