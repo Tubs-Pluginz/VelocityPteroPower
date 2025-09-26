@@ -201,7 +201,7 @@ public class ConfigurationManager {
                 logger.debug("Detected pterodactyl panel from apiKey");
                 yield PanelType.pterodactyl;
             }
-            case "plcn" -> {
+            case "plcn", "papp"-> {
                 logger.debug("Detected pelican panel from apiKey");
                 yield PanelType.pelican;
             }
