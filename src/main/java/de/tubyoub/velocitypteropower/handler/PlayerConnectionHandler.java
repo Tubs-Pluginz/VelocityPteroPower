@@ -67,7 +67,11 @@ public class PlayerConnectionHandler {
             messagesManager.prefixed(MessageKey.CONNECT_NOT_WHITELISTED));
         return;
       }
+      // Player is trying to switch to a whitelisted server they are not allowed on.
+      // Inform and deny without starting the target server or sending them to limbo.
       player.sendMessage(messagesManager.prefixed(MessageKey.CONNECT_NOT_WHITELISTED));
+      event.setResult(ServerPreConnectEvent.ServerResult.denied());
+      return;
     }
 
     String serverId = serverInfo.getServerId();
@@ -77,8 +81,7 @@ public class PlayerConnectionHandler {
       return;
     }
 
-    boolean isOnline =
-        rateLimitTracker.canMakeRequest() && apiClient.isServerOnline(serverName, serverId);
+    boolean isOnline = rateLimitTracker.canMakeRequest() && apiClient.isServerOnline(serverName, serverId);
 
     if (isOnline) {
       startingServers.remove(serverName);
@@ -323,25 +326,50 @@ public class PlayerConnectionHandler {
     long idleCheckDelay = configurationManager.getIdleStartShutdownTime();
     if (idleCheckDelay < 0) return;
 
+    long recheckInterval = Math.max(5, configurationManager.getStartupInitialCheckDelay());
+
     proxyServer
         .getScheduler()
         .buildTask(
             plugin,
-            () -> {
-              if (startingServers.contains(serverName) && rateLimitTracker.canMakeRequest()) {
-                if (apiClient.isServerOnline(serverName, serverId) && apiClient.isServerEmpty(serverName)) {
-                  logger.info(
-                      messagesManager.raw(MessageKey.SERVER_IDLE_SHUTDOWN)
-                          .replace("<server>", serverName));
-                  apiClient.powerServer(serverId, PowerSignal.STOP);
-                  startingServers.remove(serverName);
-                } else {
-                  logger.debug("Initial idle check for {}: Server not online or not empty.", serverName);
+            new Runnable() {
+              @Override
+              public void run() {
+                if (!startingServers.contains(serverName)) {
+                  logger.debug("Initial idle check for {}: Cancelled (server no longer starting).", serverName);
+                  return;
                 }
-              } else {
-                logger.debug(
-                    "Initial idle check for {}: Skipped (no longer starting or rate limited).",
-                    serverName);
+
+                if (!rateLimitTracker.canMakeRequest()) {
+                  logger.debug("Initial idle check for {}: Rate limited. Rescheduling.", serverName);
+                  reschedule();
+                  return;
+                }
+
+                boolean online = apiClient.isServerOnline(serverName, serverId);
+                if (online) {
+                  if (apiClient.isServerEmpty(serverName)) {
+                    logger.info(
+                        messagesManager.raw(MessageKey.SERVER_IDLE_SHUTDOWN)
+                            .replace("<server>", serverName));
+                    apiClient.powerServer(serverId, PowerSignal.STOP);
+                    startingServers.remove(serverName);
+                  } else {
+                    logger.debug("Initial idle check for {}: Players present. Cancelling idle shutdown task.", serverName);
+                    startingServers.remove(serverName);
+                  }
+                } else {
+                  logger.debug("Initial idle check for {}: Server not online yet. Rescheduling.", serverName);
+                  reschedule();
+                }
+              }
+
+              private void reschedule() {
+                proxyServer
+                    .getScheduler()
+                    .buildTask(plugin, this)
+                    .delay(recheckInterval, TimeUnit.SECONDS)
+                    .schedule();
               }
             })
         .delay(idleCheckDelay, TimeUnit.SECONDS)
