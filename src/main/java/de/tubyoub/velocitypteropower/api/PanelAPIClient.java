@@ -41,6 +41,13 @@ public interface PanelAPIClient {
      */
     CompletableFuture<String> fetchWhitelistFile(String serverId);
     /**
+     * Fetch live resource usage for a server, if supported by the panel implementation.
+     * Implementations may return an "unavailable" object if not supported.
+     * @param serverId The server ID on the panel
+     * @return A future with resource usage information
+     */
+    CompletableFuture<de.tubyoub.velocitypteropower.model.ServerResourceUsage> fetchServerResources(String serverId);
+    /**
     * Checks if the ApiKey is valid
     * @param apiKey ApiKey which need to be checked if its valid
      * @return {@code true} apiKey is considered valid {@code false} apiKey is considered invalid

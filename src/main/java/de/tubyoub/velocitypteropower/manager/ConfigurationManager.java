@@ -57,6 +57,15 @@ public class ConfigurationManager {
     private int whitelistCheckInterval;
     private ServerCheckMethod serverCheckMethod;
     private List<String> stopAllIgnoreList;
+    private int maxOnlineServers;
+    private boolean maxOnlineAllowBypass;
+    private List<String> maxOnlineExemptList;
+    private List<String> alwaysOnlineList;
+    private int alwaysOnlineCheckInterval;
+    private int resourceCacheSeconds;
+    private boolean resourcePrefetchEnabled;
+    private int idleShutdownCheckInterval;
+
     private final VelocityPteroPower plugin;
     private final Logger logger;
     private Map<String, PteroServerInfo> serverInfoMap;
@@ -92,6 +101,8 @@ public class ConfigurationManager {
                                         .addIgnoredRoute("6", "servers", '.')
                                         .addIgnoredRoute("7", "servers", '.')
                                         .addIgnoredRoute("8", "servers", '.')
+                                        .addIgnoredRoute("9", "servers", '.')
+                                        .addIgnoredRoute("10", "servers", '.')
                                         .build());
 
 
@@ -110,6 +121,14 @@ public class ConfigurationManager {
             playerCommandCooldown = (int) config.get("playerCommandCooldown", 10);
             startupInitialCheckDelay = (int) config.get("startupInitialCheckDelay", 10);
             whitelistCheckInterval = (int) config.get("whitelistCheckInterval", 10);
+            maxOnlineServers = (int) config.get("maxOnlineServers", 0);
+            maxOnlineAllowBypass = (boolean) config.get("maxOnlineAllowBypass", true);
+            maxOnlineExemptList = config.getStringList("maxOnlineExempt");
+            alwaysOnlineList = config.getStringList("alwaysOnline");
+            alwaysOnlineCheckInterval = (int) config.get("alwaysOnlineCheckInterval", 60);
+            resourceCacheSeconds = (int) config.get("resourceCacheSeconds", 10);
+            resourcePrefetchEnabled = (boolean) config.get("resourcePrefetchEnabled", true);
+            idleShutdownCheckInterval = (int) config.get("idleShutdownCheckInterval", 60);
 
             limboServer = (String) config.get("limboServer", "changeMe");
             stopAllIgnoreList = config.getStringList("stopIdleIgnore");
@@ -326,5 +345,36 @@ public class ConfigurationManager {
     public ServerCheckMethod getServerCheckMethod() {
         return serverCheckMethod;
     }
+    
+    public int getMaxOnlineServers() {
+        return maxOnlineServers;
+    }
 
+    public boolean isMaxOnlineAllowBypass() {
+        return maxOnlineAllowBypass;
+    }
+
+    public java.util.List<String> getMaxOnlineExemptList() {
+        return maxOnlineExemptList == null ? java.util.Collections.emptyList() : maxOnlineExemptList;
+    }
+
+    public java.util.List<String> getAlwaysOnlineList() {
+        return alwaysOnlineList == null ? java.util.Collections.emptyList() : alwaysOnlineList;
+    }
+
+    public int getAlwaysOnlineCheckInterval() {
+        return alwaysOnlineCheckInterval;
+    }
+
+    public int getResourceCacheSeconds() {
+        return Math.max(0, resourceCacheSeconds);
+    }
+
+    public boolean isResourcePrefetchEnabled() {
+        return resourcePrefetchEnabled;
+    }
+
+    public int getIdleShutdownCheckInterval() {
+        return Math.max(0, idleShutdownCheckInterval);
+    }
 }

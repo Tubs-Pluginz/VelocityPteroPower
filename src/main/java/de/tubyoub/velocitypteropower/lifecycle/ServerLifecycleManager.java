@@ -14,6 +14,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +35,8 @@ public class ServerLifecycleManager {
 
   // State managed by this class
   private final Map<String, Integer> shutdownRetryCounts = new ConcurrentHashMap<>();
+  // Track scheduled shutdown tasks centrally to avoid duplicates between listeners and periodic sweep
+  private final Map<String, ScheduledTask> scheduledShutdowns = new ConcurrentHashMap<>();
 
   /**
    * Constructor for ServerLifecycleManager.
@@ -62,6 +65,15 @@ public class ServerLifecycleManager {
    * @return The scheduled task, or null if disabled by configuration.
    */
   public ScheduledTask scheduleServerShutdown(String serverName, String serverId, int timeoutSeconds) {
+    // Always-online servers must never be auto-shutdown, regardless of per-server timeout
+    var alwaysOnline = configurationManager.getAlwaysOnlineList();
+    if (alwaysOnline != null && alwaysOnline.stream().anyMatch(s -> s.equalsIgnoreCase(serverName))) {
+      logger.debug("Skipping shutdown scheduling for always-online server '{}'.", serverName);
+      // Ensure no TTL is shown for this server
+      plugin.getShutdownDeadlines().remove(serverName);
+      return null;
+    }
+
     if (timeoutSeconds < 0) {
       logger.debug("Automatic shutdown disabled for server '{}' (timeout < 0).", serverName);
       return null;
@@ -79,6 +91,9 @@ public class ServerLifecycleManager {
         .buildTask(
             plugin,
             () -> {
+              // Clear tracking and any displayed deadline when the scheduled check fires
+              scheduledShutdowns.remove(serverName);
+              plugin.getShutdownDeadlines().remove(serverName);
               // Check emptiness and rate limit before sending stop
               boolean empty = apiClient.isServerEmpty(serverName);
               if (rateLimitTracker.canMakeRequest() && empty) {
@@ -106,6 +121,65 @@ public class ServerLifecycleManager {
             })
         .delay(timeoutSeconds, TimeUnit.SECONDS)
         .schedule();
+  }
+
+  public boolean hasScheduledShutdown(String serverName) {
+    return scheduledShutdowns.containsKey(serverName);
+  }
+
+  public void cancelScheduledShutdown(String serverName, String reason) {
+    ScheduledTask existing = scheduledShutdowns.remove(serverName);
+    if (existing != null) {
+      existing.cancel();
+      clearRetryCount(serverName);
+      plugin.getShutdownDeadlines().remove(serverName);
+      logger.info(
+          messages.raw(MessageKey.SERVER_SHUTDOWN_CANCELLED)
+              .replace("<server>", serverName)
+              .replace("<reason>", reason));
+    } else {
+      logger.debug("No pending shutdown task found for server '{}' to cancel.", serverName);
+    }
+  }
+
+  public void checkAndScheduleShutdownIfNeeded(String serverName, PteroServerInfo serverInfo) {
+    if (hasScheduledShutdown(serverName)) {
+      logger.debug("Shutdown check for '{}': Task already pending.", serverName);
+      return;
+    }
+
+    var alwaysOnline = configurationManager.getAlwaysOnlineList();
+    if (alwaysOnline != null && alwaysOnline.stream().anyMatch(s -> s.equalsIgnoreCase(serverName))) {
+      logger.debug("Always-online is set for '{}'; skipping idle shutdown scheduling.", serverName);
+      plugin.getShutdownDeadlines().remove(serverName);
+      return;
+    }
+
+    // Only schedule a shutdown when the server is actually ONLINE
+    boolean online = false;
+    try {
+      online = apiClient.isServerOnline(serverName, serverInfo.getServerId());
+    } catch (Exception ex) {
+      logger.debug("Online check failed for '{}': {}", serverName, ex.toString());
+      online = false;
+    }
+
+    if (!online) {
+      logger.debug("Server '{}' is offline or unknown. Skipping idle shutdown scheduling.", serverName);
+      plugin.getShutdownDeadlines().remove(serverName);
+      return;
+    }
+
+    if (apiClient.isServerEmpty(serverName)) {
+      logger.debug("Server '{}' is empty. Scheduling shutdown.", serverName);
+      ScheduledTask shutdownTask = scheduleServerShutdown(serverName, serverInfo.getServerId(), serverInfo.getTimeout());
+      if (shutdownTask != null) {
+        scheduledShutdowns.put(serverName, shutdownTask);
+        plugin.getShutdownDeadlines().put(serverName, System.currentTimeMillis() + (serverInfo.getTimeout() * 1000L));
+      }
+    } else {
+      logger.debug("Server '{}' is not empty. No shutdown needed.", serverName);
+    }
   }
 
   /**
@@ -144,7 +218,7 @@ public class ServerLifecycleManager {
                             Map.of(
                                 "server", serverName,
                                 "retry", String.valueOf(nextRetry),
-                                "maxRetries", String.valueOf(maxRetries))));
+                                "maxretries", String.valueOf(maxRetries))));
 
                     apiClient.powerServer(serverId, PowerSignal.STOP);
                     scheduleShutdownConfirmationCheck(serverName, serverId);
@@ -178,5 +252,149 @@ public class ServerLifecycleManager {
    */
   public void clearRetryCount(String serverName) {
     shutdownRetryCounts.remove(serverName);
+  }
+
+  /**
+   * Counts the number of currently online managed servers, excluding any provided names.
+   * If PANEL_API is used and rate limited, returns -1 to indicate unknown.
+   */
+  public void scheduleIdleShutdownSweep() {
+    int interval = configurationManager.getIdleShutdownCheckInterval();
+    if (interval <= 0) {
+      logger.debug("Idle shutdown sweep disabled (interval <= 0).");
+      return;
+    }
+
+    Runnable task = new Runnable() {
+      @Override public void run() {
+        try {
+          for (Map.Entry<String, PteroServerInfo> e : serverInfoMap.entrySet()) {
+            String name = e.getKey();
+            PteroServerInfo info = e.getValue();
+            if (info == null) continue;
+
+            // Always-online override
+            var alwaysOnline = configurationManager.getAlwaysOnlineList();
+            if (alwaysOnline != null && alwaysOnline.stream().anyMatch(s -> s.equalsIgnoreCase(name))) {
+              plugin.getShutdownDeadlines().remove(name);
+              continue;
+            }
+
+            int timeout = info.getTimeout();
+            if (timeout < 0) continue; // disabled per-server
+
+            if (hasScheduledShutdown(name)) {
+              continue; // already pending
+            }
+
+            // Only schedule when online
+            boolean online = false;
+            try {
+              online = apiClient.isServerOnline(name, info.getServerId());
+            } catch (Exception ex) {
+              logger.debug("Idle sweep: online check failed for '{}': {}", name, ex.toString());
+              online = false;
+            }
+            if (!online) {
+              logger.debug("Idle sweep: '{}' is offline or unknown. Skipping scheduling.");
+              plugin.getShutdownDeadlines().remove(name);
+              continue;
+            }
+
+            if (apiClient.isServerEmpty(name)) {
+              logger.debug("[DEBUG] Idle sweep: scheduling shutdown for '{}' (timeout={}s)", name, timeout);
+              ScheduledTask t = scheduleServerShutdown(name, info.getServerId(), timeout);
+              if (t != null) {
+                scheduledShutdowns.put(name, t);
+                plugin.getShutdownDeadlines().put(name, System.currentTimeMillis() + timeout * 1000L);
+              }
+            }
+          }
+        } catch (Exception ex) {
+          logger.error("Error in idle shutdown sweep: {}", ex.toString());
+        } finally {
+          reschedule();
+        }
+      }
+
+      private void reschedule() {
+        proxyServer.getScheduler().buildTask(plugin, this).delay(interval, TimeUnit.SECONDS).schedule();
+      }
+    };
+
+    proxyServer.getScheduler().buildTask(plugin, task).delay(interval, TimeUnit.SECONDS).schedule();
+    logger.info("Scheduled idle shutdown sweep every {} seconds.", interval);
+  }
+
+  public int countOnlineServersExcluding(Set<String> exempt) {
+    var method = configurationManager.getServerCheckMethod();
+    if (method == ConfigurationManager.ServerCheckMethod.PANEL_API && !rateLimitTracker.canMakeRequest()) {
+      logger.warn("Skipping online server count due to API rate limiting.");
+      return -1; // unknown due to rate limit
+    }
+    int count = 0;
+    for (Map.Entry<String, PteroServerInfo> e : serverInfoMap.entrySet()) {
+      String name = e.getKey();
+      if (exempt != null && exempt.contains(name)) continue;
+      PteroServerInfo info = e.getValue();
+      try {
+        if (apiClient.isServerOnline(name, info.getServerId())) {
+          count++;
+        }
+      } catch (Exception ex) {
+        logger.debug("Error checking online status for {}: {}", name, ex.toString());
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Periodically ensures that configured servers are kept online.
+   */
+  public void scheduleAlwaysOnlineMaintenance() {
+    int interval = configurationManager.getAlwaysOnlineCheckInterval();
+    var keepOnline = configurationManager.getAlwaysOnlineList();
+    if (interval <= 0 || keepOnline == null || keepOnline.isEmpty()) {
+      logger.debug("Always-online maintenance disabled or no servers configured.");
+      return;
+    }
+
+    Runnable task = new Runnable() {
+      @Override public void run() {
+        try {
+          var method = configurationManager.getServerCheckMethod();
+          boolean canQuery = method == ConfigurationManager.ServerCheckMethod.VELOCITY_PING || rateLimitTracker.canMakeRequest();
+          if (!canQuery) {
+            logger.debug("Always-online check skipped due to API rate limiting.");
+          } else {
+            for (String name : keepOnline) {
+              PteroServerInfo info = serverInfoMap.get(name);
+              if (info == null) {
+                logger.warn("Always-online server '{}' not found in configuration.", name);
+                continue;
+              }
+              String id = info.getServerId();
+              boolean online = apiClient.isServerOnline(name, id);
+              if (!online) {
+                logger.info(messages.mm(MessageKey.POWER_ACTION_SENT, Map.of("action", "start", "server", name)));
+                apiClient.powerServer(id, PowerSignal.START);
+              }
+            }
+          }
+        } catch (Exception ex) {
+          logger.error("Error in always-online maintenance: {}", ex.toString());
+        } finally {
+          reschedule();
+        }
+      }
+
+      private void reschedule() {
+        proxyServer.getScheduler().buildTask(plugin, this).delay(interval, TimeUnit.SECONDS).schedule();
+      }
+    };
+
+    // schedule first run
+    proxyServer.getScheduler().buildTask(plugin, task).delay(interval, TimeUnit.SECONDS).schedule();
+    logger.info("Scheduled always-online maintenance every {} seconds for {} server(s).", interval, keepOnline.size());
   }
 }

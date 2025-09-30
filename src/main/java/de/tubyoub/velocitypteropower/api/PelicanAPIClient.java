@@ -29,6 +29,178 @@ import java.util.concurrent.*;
  */
 public class PelicanAPIClient extends AbstractPanelAPIClient {
 
+    @Override
+    public java.util.concurrent.CompletableFuture<de.tubyoub.velocitypteropower.model.ServerResourceUsage> fetchServerResources(String serverId) {
+        return fetchWithCache(serverId, () -> {
+            if (serverId == null || serverId.isBlank()) {
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+            if (!rateLimitTracker.canMakeRequest()) {
+                logger.warn("Rate limit reached. Skipping Pelican resources fetch for {}.", serverId);
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+            try {
+                logger.debug("Fetching Pelican resources for {} (cache ttl={}s)", serverId, configurationManager.getResourceCacheSeconds());
+                // Fetch limits from server details
+                String base = configurationManager.getPterodactylUrl();
+                java.net.http.HttpRequest detailsReq = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(base + "api/client/servers/" + serverId))
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
+                    .GET()
+                    .timeout(java.time.Duration.ofSeconds(10))
+                    .build();
+                java.net.http.HttpResponse<String> detailsResp = httpClient.send(detailsReq, java.net.http.HttpResponse.BodyHandlers.ofString());
+                rateLimitTracker.updateRateLimitInfo(detailsResp);
+                long memLimitBytes = -1L;
+                long diskLimitBytes = -1L;
+                double cpuLimitPercent = -1.0;
+                if (detailsResp.statusCode() == 200 && detailsResp.body() != null) {
+                    String djson = detailsResp.body();
+                    long memMiB = extractLong(djson, "\"limits\"", "\"memory\"");
+                    if (memMiB >= 0) memLimitBytes = memMiB * 1024L * 1024L; // 0 unlimited
+                    long diskMiB = extractLong(djson, "\"limits\"", "\"disk\"");
+                    if (diskMiB >= 0) diskLimitBytes = diskMiB * 1024L * 1024L; // 0 unlimited
+                    double cpuPct = extractDouble(djson, "\"limits\"", "\"cpu\"");
+                    if (cpuPct >= 0) cpuLimitPercent = cpuPct; // 0 unlimited
+                }
+
+                // Fetch live resources
+                java.net.http.HttpRequest resReq = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(base + "api/client/servers/" + serverId + "/resources"))
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
+                    .GET()
+                    .timeout(java.time.Duration.ofSeconds(10))
+                    .build();
+                java.net.http.HttpResponse<String> resResp = httpClient.send(resReq, java.net.http.HttpResponse.BodyHandlers.ofString());
+                rateLimitTracker.updateRateLimitInfo(resResp);
+                if (resResp.statusCode() != 200 || resResp.body() == null) {
+                    logger.debug("Pelican resources fetch for {} returned status {}", serverId, resResp.statusCode());
+                    return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+                }
+                String json = resResp.body();
+                String state = extractString(json, "\"current_state\"");
+                boolean suspended = extractBoolean(json, "\"is_suspended\"");
+                long mem = extractLongFlat(json, "\"memory_bytes\"");
+                double cpu = extractDoubleFlat(json, "\"cpu_absolute\"");
+                long disk = extractLongFlat(json, "\"disk_bytes\"");
+                long rx = extractLongFlat(json, "\"network_rx_bytes\"");
+                long tx = extractLongFlat(json, "\"network_tx_bytes\"");
+                long uptime = extractLongFlat(json, "\"uptime\"");
+
+                logger.debug("Parsed Pelican resources for {} -> state={}, suspended={}, mem={}B/{}B, cpu={}%, disk={}B, rx={}B, tx={}B, uptime={}ms",
+                        serverId, state, suspended, mem, memLimitBytes, cpu, disk, rx, tx, uptime);
+
+                return new de.tubyoub.velocitypteropower.model.ServerResourceUsage(
+                    state != null ? state : "unknown",
+                    suspended,
+                    mem,
+                    memLimitBytes,
+                    cpu,
+                    cpuLimitPercent,
+                    disk,
+                    diskLimitBytes,
+                    rx,
+                    tx,
+                    uptime,
+                    true
+                );
+            } catch (Exception e) {
+                logger.error("Error fetching Pelican resources for {}: {}", serverId, e.toString());
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+        });
+    }
+
+    private String extractString(String json, String key) {
+        int idx = json.indexOf(key);
+        if (idx == -1) return null;
+        int colon = json.indexOf(':', idx);
+        if (colon == -1) return null;
+        int firstQuote = json.indexOf('"', colon + 1);
+        if (firstQuote == -1) return null;
+        int secondQuote = json.indexOf('"', firstQuote + 1);
+        if (secondQuote == -1) return null;
+        return json.substring(firstQuote + 1, secondQuote);
+    }
+
+    private boolean extractBoolean(String json, String key) {
+        int idx = json.indexOf(key);
+        if (idx == -1) return false;
+        int colon = json.indexOf(':', idx);
+        if (colon == -1) return false;
+        int end = json.indexOf(',', colon + 1);
+        String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).trim();
+        return val.startsWith("true");
+    }
+
+    private long extractLongFlat(String json, String key) {
+        try {
+            int idx = json.indexOf(key);
+            if (idx == -1) return 0L;
+            int colon = json.indexOf(':', idx);
+            if (colon == -1) return 0L;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9]", "").trim();
+            if (val.isEmpty()) return 0L;
+            return Long.parseLong(val);
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    private double extractDoubleFlat(String json, String key) {
+        try {
+            int idx = json.indexOf(key);
+            if (idx == -1) return 0.0;
+            int colon = json.indexOf(':', idx);
+            if (colon == -1) return 0.0;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9.\\-]", "").trim();
+            if (val.isEmpty()) return 0.0;
+            return Double.parseDouble(val);
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    private long extractLong(String json, String parentKey, String childKey) {
+        try {
+            int p = json.indexOf(parentKey);
+            if (p == -1) return 0L;
+            int c = json.indexOf(childKey, p);
+            if (c == -1) return 0L;
+            int colon = json.indexOf(':', c);
+            if (colon == -1) return 0L;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9]", "").trim();
+            if (val.isEmpty()) return 0L;
+            return Long.parseLong(val);
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    private double extractDouble(String json, String parentKey, String childKey) {
+        try {
+            int p = json.indexOf(parentKey);
+            if (p == -1) return 0.0;
+            int c = json.indexOf(childKey, p);
+            if (c == -1) return 0.0;
+            int colon = json.indexOf(':', c);
+            if (colon == -1) return 0.0;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9.\\-]", "").trim();
+            if (val.isEmpty()) return 0.0;
+            return Double.parseDouble(val);
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
     /**
      * Constructs a PelicanAPIClient.
      *

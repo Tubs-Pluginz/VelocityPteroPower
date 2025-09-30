@@ -65,6 +65,7 @@ public class VelocityPteroPower {
     private Map<String, PteroServerInfo> serverInfoMap = new ConcurrentHashMap<>();
     private final Set<String> startingServers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Long> playerCooldowns = new ConcurrentHashMap<>();
+    private final Map<String, Long> shutdownDeadlines = new ConcurrentHashMap<>();
 
     @Inject
     public VelocityPteroPower(
@@ -112,6 +113,37 @@ public class VelocityPteroPower {
         this.serverLifecycleManager = new ServerLifecycleManager(proxyServer, this);
         this.playerConnectionHandler = new PlayerConnectionHandler(proxyServer, this);
         this.serverSwitchListener = new ServerSwitchListener(this, serverLifecycleManager);
+        // Schedule periodic enforcement of always-online servers
+        this.serverLifecycleManager.scheduleAlwaysOnlineMaintenance();
+        // Schedule periodic idle shutdown sweep (failsafe)
+        this.serverLifecycleManager.scheduleIdleShutdownSweep();
+
+        // Periodic resource usage prefetch (warm cache) if enabled
+        if (configurationManager.isResourcePrefetchEnabled()) {
+            final int interval = Math.max(1, configurationManager.getResourceCacheSeconds());
+            Runnable prefetchTask = new Runnable() {
+                @Override public void run() {
+                    try {
+                        Map<String, PteroServerInfo> map = getServerInfoMap();
+                        if (map != null && !map.isEmpty()) {
+                            for (PteroServerInfo info : map.values()) {
+                                try {
+                                    filteredLogger.debug("Prefetching resources for serverId={}", info.getServerId());
+                                    apiClient.fetchServerResources(info.getServerId());
+                                } catch (Exception ignored) {
+                                }
+                            }
+                        }
+                    } catch (Exception ex) {
+                        filteredLogger.debug("Resource prefetch error: {}", ex.toString());
+                    } finally {
+                        proxyServer.getScheduler().buildTask(VelocityPteroPower.this, this).delay(interval, java.util.concurrent.TimeUnit.SECONDS).schedule();
+                    }
+                }
+            };
+            proxyServer.getScheduler().buildTask(this, prefetchTask).delay(interval, java.util.concurrent.TimeUnit.SECONDS).schedule();
+            filteredLogger.info("Scheduled resource usage prefetch every {} seconds for {} server(s).", interval, serverInfoMap.size());
+        }
 
         commandManager.register(
                 commandManager.metaBuilder("ptero").aliases("vpp").build(), new PteroCommand(this));
@@ -274,5 +306,9 @@ public class VelocityPteroPower {
 
     public Map<UUID, Long> getPlayerCooldowns() {
         return playerCooldowns;
+    }
+
+    public Map<String, Long> getShutdownDeadlines() {
+        return shutdownDeadlines;
     }
 }

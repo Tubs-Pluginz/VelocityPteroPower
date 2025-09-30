@@ -24,6 +24,11 @@ command:
   force-stopping-all-servers: "<gray>Force-stopping</gray> <yellow><count></yellow> <gray>servers. This may take some time.</gray>"
   cooldown-active: "<yellow>You are on cooldown. Please wait <timeout> seconds before trying again.</yellow>"
   help-header: "<green>VelocityPteroPower commands:</green>"
+  list-header: "<gradient:#42A5F5:#00E5FF><bold>Managed Servers</bold></gradient> <gray>(status | players | TTL)</gray>"
+  list-entry: "<gray>•</gray> <aqua><server></aqua> <gray>|</gray> <status_formatted> <gray>|</gray> <yellow><players></yellow> <gray>players</gray> <gray>| TTL:</gray> <yellow><ttl></yellow>"
+  info-header: "<gradient:#00E5FF:#42A5F5><bold>Server Info:</bold> <server></gradient>"
+  info-not-found: "<red>Server '<server>' is not managed by VelocityPteroPower.</red>"
+  info-body: "<gray>Status:</gray> <status_formatted>\n<gray>Players:</gray> <yellow><players></yellow>\n<gray>CPU:</gray> <cpu>\n<gray>Memory:</gray> <memory>\n<gray>Disk:</gray> <disk>\n<gray>Net:</gray> <yellow><rx></yellow> <gray>in</gray>, <yellow><tx></yellow> <gray>out</gray>\n<gray>Uptime:</gray> <yellow><uptime></yellow>" 
 
 connect:
   unmanaged-server: "<red>Server not found in configuration:</red> <yellow><server></yellow>"
@@ -34,6 +39,7 @@ connect:
   start-timeout: "<red>Server '<server>' did not start in time.</red>"
   target-server-not-found: "<red>Target server '<server>' is not available.</red>"
   not-whitelisted: "<red>You are not whitelisted on this server.</red>"
+  max-online-reached: "<red>Cannot start server.</red> <gray>Maximum number of online servers reached (</gray><yellow><max></yellow><gray>).</gray>" 
 
 server:
   starting: "<gray>Server is starting...</gray>"
@@ -46,7 +52,7 @@ server:
   shutdown-cancelled: "<yellow>Shutdown cancelled for server:</yellow> <yellow><server></yellow><gray>. Reason:</gray> <yellow><reason></yellow>"
   shutdown-success: "<green>Server</green> <yellow><server></yellow> <green>has been successfully shutdown.</green>"
   shutdown-failed: "<red>Failed to shutdown server:</red> <yellow><server></yellow><red>. After</red> <yellow><retry></yellow><red>.</red>"
-  still-online-retrying: "<yellow>Server</yellow> <yellow><server></yellow> <yellow>is still online. Retrying shutdown.</yellow> <gray>(attempt:</gray> <yellow><retry></yellow><gray>/</gray><yellow><maxRetries></yellow><gray>).</gray>"
+  still-online-retrying: "<yellow>Server</yellow> <yellow><server></yellow> <yellow>is still online. Retrying shutdown.</yellow> <gray>(attempt:</gray> <yellow><retry></yellow><gray>/</gray><yellow><maxretries></yellow><gray>).</gray>"
 
 power:
   action-sent: "<gray>Sent power action</gray> '<yellow><action></yellow>' <gray>to server</gray> '<yellow><server></yellow>'."

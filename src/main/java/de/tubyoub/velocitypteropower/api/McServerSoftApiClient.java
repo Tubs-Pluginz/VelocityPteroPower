@@ -20,6 +20,97 @@ import org.slf4j.Logger;
 
 public class McServerSoftApiClient extends AbstractPanelAPIClient {
 
+    @Override
+    public java.util.concurrent.CompletableFuture<de.tubyoub.velocitypteropower.model.ServerResourceUsage> fetchServerResources(String serverId) {
+        return fetchWithCache(serverId, () -> {
+            if (serverId == null || serverId.isBlank()) {
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+            try {
+                logger.debug("Fetching MC Server Soft resources for {} (cache ttl={}s)", serverId, configurationManager.getResourceCacheSeconds());
+                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(configurationManager.getPterodactylUrl() + "api/v2/servers/" + serverId + "/stats"))
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("apiKey", configurationManager.getPterodactylApiKey())
+                    .GET()
+                    .timeout(java.time.Duration.ofSeconds(10))
+                    .build();
+                java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+                String body = response.body();
+                if (response.statusCode() != 200 || body == null) {
+                    logger.debug("MCSS resources fetch for {} returned status {}", serverId, response.statusCode());
+                    return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+                }
+                // Parse fields under "latest"
+                long memUsedMiB = extractLongUnderLatest(body, "\"memoryUsed\"");
+                long memLimitMiB = extractLongUnderLatest(body, "\"memoryLimit\"");
+                double cpu = extractDoubleUnderLatest(body, "\"cpu\"");
+                long startDate = extractLongUnderLatest(body, "\"startDate\"");
+                long uptime = startDate > 0 ? Math.max(0L, System.currentTimeMillis() - startDate) : 0L;
+                long memUsedBytes = memUsedMiB * 1024L * 1024L;
+                long memLimitBytes = memLimitMiB * 1024L * 1024L;
+                // Disk and network stats not available => set sentinel -1 to render as N/A
+                long disk = -1L;
+                long rx = -1L;
+                long tx = -1L;
+
+                logger.debug("Parsed MCSS resources for {} -> mem={}B/{}B, cpu={}%, uptime={}ms (disk/net N/A)",
+                        serverId, memUsedBytes, memLimitBytes, cpu, uptime);
+
+                return new de.tubyoub.velocitypteropower.model.ServerResourceUsage(
+                    "unknown",
+                    false,
+                    memUsedBytes,
+                    memLimitBytes,
+                    cpu,
+                    0.0,
+                    disk,
+                    0L,
+                    rx,
+                    tx,
+                    uptime,
+                    true
+                );
+            } catch (Exception e) {
+                logger.error("Error fetching MCSS resources for {}: {}", serverId, e.toString());
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+        });
+    }
+
+    private long extractLongUnderLatest(String json, String key) {
+        try {
+            int latest = json.indexOf("\"latest\"");
+            int idx = latest == -1 ? json.indexOf(key) : json.indexOf(key, latest);
+            if (idx == -1) return 0L;
+            int colon = json.indexOf(':', idx);
+            if (colon == -1) return 0L;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9]", "").trim();
+            if (val.isEmpty()) return 0L;
+            return Long.parseLong(val);
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    private double extractDoubleUnderLatest(String json, String key) {
+        try {
+            int latest = json.indexOf("\"latest\"");
+            int idx = latest == -1 ? json.indexOf(key) : json.indexOf(key, latest);
+            if (idx == -1) return 0.0;
+            int colon = json.indexOf(':', idx);
+            if (colon == -1) return 0.0;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9.\\-]", "").trim();
+            if (val.isEmpty()) return 0.0;
+            return Double.parseDouble(val);
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
     /**
      * Constructs a PterodactylAPIClient.
      *

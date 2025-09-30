@@ -1,6 +1,8 @@
 # VelocityPteroPower Nachrichten - Deutsch (DE), MiniMessage
 fileversion: 1
 
+# Use MiniMessage for styling. You can add gradients, hover, click, etc.
+# Example gradient prefix:
 prefix: "<gradient:#42A5F5:#00E5FF><bold>VPP</bold></gradient>"
 
 generic:
@@ -22,6 +24,11 @@ command:
   force-stopping-all-servers: "<gray>Erzwinge das Stoppen von</gray> <yellow><count></yellow> <gray>Servern. Dies kann einige Zeit dauern.</gray>"
   cooldown-active: "<yellow>Du hast eine Abklingzeit. Bitte warte <timeout> Sekunden.</yellow>"
   help-header: "<green>VelocityPteroPower Befehle:</green>"
+  list-header: "<gradient:#42A5F5:#00E5FF><bold>Verwaltete Server</bold></gradient> <gray>(Status | Spieler | TTL)</gray>"
+  list-entry: "<gray>•</gray> <aqua><server></aqua> <gray>|</gray> <status_formatted> <gray>|</gray> <yellow><players></yellow> <gray>Spieler</gray> <gray>| TTL:</gray> <yellow><ttl></yellow>"
+  info-header: "<gradient:#00E5FF:#42A5F5><bold>Server-Info:</bold> <server></gradient>"
+  info-not-found: "<red>Server '<server>' wird nicht von VelocityPteroPower verwaltet.</red>"
+  info-body: "<gray>Status:</gray> <status_formatted>\n<gray>Spieler:</gray> <yellow><players></yellow>\n<gray>CPU:</gray> <cpu>\n<gray>Arbeitsspeicher:</gray> <memory>\n<gray>Festplatte:</gray> <disk>\n<gray>Netz:</gray> <yellow><rx></yellow> <gray>rein</gray>, <yellow><tx></yellow> <gray>raus</gray>\n<gray>Laufzeit:</gray> <yellow><uptime></yellow>" 
 
 connect:
   unmanaged-server: "<red>Server nicht in der Konfiguration gefunden:</red> <yellow><server></yellow>"
@@ -32,6 +39,7 @@ connect:
   start-timeout: "<red>Server '<server>' ist nicht rechtzeitig gestartet.</red>"
   target-server-not-found: "<red>Zielserver '<server>' ist nicht verfügbar.</red>"
   not-whitelisted: "<red>Du bist auf diesem Server nicht auf der Whitelist.</red>"
+  max-online-reached: "<red>Server kann nicht gestartet werden.</red> <gray>Maximale Anzahl gleichzeitig laufender Server erreicht (</gray><yellow><max></yellow><gray>).</gray>"
 
 server:
   starting: "<gray>Server startet...</gray>"
@@ -44,7 +52,7 @@ server:
   shutdown-cancelled: "<yellow>Herunterfahren abgebrochen für Server:</yellow> <yellow><server></yellow><gray>. Grund:</gray> <yellow><reason></yellow>"
   shutdown-success: "<green>Server</green> <yellow><server></yellow> <green>erfolgreich heruntergefahren.</green>"
   shutdown-failed: "<red>Herunterfahren fehlgeschlagen für Server:</red> <yellow><server></yellow><red>. Nach</red> <yellow><retry></yellow><red>.</red>"
-  still-online-retrying: "<yellow>Server</yellow> <yellow><server></yellow> <yellow>ist noch online. Erneuter Versuch.</yellow> <gray>(Versuch:</gray> <yellow><retry></yellow><gray>/</gray><yellow><maxRetries></yellow><gray>).</gray>"
+  still-online-retrying: "<yellow>Server</yellow> <yellow><server></yellow> <yellow>ist noch online. Erneuter Versuch.</yellow> <gray>(Versuch:</gray> <yellow><retry></yellow><gray>/</gray><yellow><maxretries></yellow><gray>).</gray>"
 
 power:
   action-sent: "<gray>Sende Aktion</gray> '<yellow><action></yellow>' <gray>an Server</gray> '<yellow><server></yellow>'."

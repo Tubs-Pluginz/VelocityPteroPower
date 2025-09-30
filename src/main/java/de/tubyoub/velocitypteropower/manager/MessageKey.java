@@ -26,6 +26,11 @@ public enum MessageKey {
     COMMAND_FORCE_STOPPING_ALL_SERVERS("command.force-stopping-all-servers"),
     COMMAND_HELP_HEADER("command.help-header"),
     COMMAND_COOLDOWN_ACTIVE("command.cooldown-active"),
+    COMMAND_LIST_HEADER("command.list-header"),
+    COMMAND_LIST_ENTRY("command.list-entry"),
+    COMMAND_INFO_HEADER("command.info-header"),
+    COMMAND_INFO_BODY("command.info-body"),
+    COMMAND_INFO_NOT_FOUND("command.info-not-found"),
 
     // Connection flow
     CONNECT_UNMANAGED_SERVER("connect.unmanaged-server"),
@@ -36,6 +41,7 @@ public enum MessageKey {
     CONNECT_START_TIMEOUT("connect.start-timeout"),
     CONNECT_TARGET_SERVER_NOT_FOUND("connect.target-server-not-found"),
     CONNECT_NOT_WHITELISTED("connect.not-whitelisted"),
+    CONNECT_MAX_ONLINE_REACHED("connect.max-online-reached"),
 
     // Server lifecycle
     SERVER_STARTING("server.starting"),

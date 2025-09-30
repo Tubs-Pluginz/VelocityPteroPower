@@ -150,6 +150,24 @@ public class PlayerConnectionHandler {
       return;
     }
 
+    // Enforce maximum concurrent online servers (excluding exempt), unless bypassed
+    int maxOnline = configurationManager.getMaxOnlineServers();
+    boolean hasBypass = configurationManager.isMaxOnlineAllowBypass() && player.hasPermission("ptero.maxcap.bypass");
+    if (maxOnline > 0 && !hasBypass) {
+      java.util.Set<String> exempt = new java.util.HashSet<>(configurationManager.getMaxOnlineExemptList());
+      if (!exempt.contains(serverName)) {
+        int onlineCount = plugin.getServerLifecycleManager().countOnlineServersExcluding(exempt);
+        if (onlineCount >= maxOnline && onlineCount != -1) {
+          player.sendMessage(
+              messagesManager.prefixed(
+                  MessageKey.CONNECT_MAX_ONLINE_REACHED,
+                  "max", String.valueOf(maxOnline)));
+          event.setResult(ServerPreConnectEvent.ServerResult.denied());
+          return;
+        }
+      }
+    }
+
     if (!startingServers.contains(serverName)) {
       logger.info(
           "Attempting to start server '{}' ({}) for player {}",

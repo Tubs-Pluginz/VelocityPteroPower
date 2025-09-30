@@ -1,10 +1,10 @@
 ################################
 #      VelocityPteroPower      #
-#         by TubYoub           #
+#         by TubYoub            #
 ################################
 
 # Version of the configuration file
-fileversion: 8
+fileversion: 10
 
 # Check for updates
 # If true, the plugin will check for updates on startup.
@@ -104,6 +104,45 @@ whitelistAllowBypass: true
 # How long (in minutes) VPP should wait in between checks for a new whitelist and enforce it (if enabled)
 # default: 10
 whitelistCheckInterval: 10
+
+# Limit how many managed servers may be online concurrently. 0 = unlimited
+# default = 0
+maxOnlineServers: 0
+
+# Allow players with the permission "ptero.maxcap.bypass" to bypass the maxOnlineServers cap when starting servers.
+# default: true
+maxOnlineAllowBypass: true
+
+# Servers excluded from the above cap (by Velocity server name)
+maxOnlineExempt:
+  - hub
+  - lobby
+  - limbo
+
+# Servers that should always be kept online. The plugin will periodically check and start them if offline.
+alwaysOnline:
+  - limbo
+
+# How often to check/enforce the alwaysOnline list (in seconds)
+# default = 60
+alwaysOnlineCheckInterval: 60
+
+# Resource usage caching for panel queries
+# How long to cache resource usage responses (in seconds). Set to 0 to disable caching.
+# default = 10
+resourceCacheSeconds: 10
+
+# If enabled, the plugin will periodically prefetch resource usage for all managed servers
+# every 'resourceCacheSeconds' to keep the cache warm and make commands snappy.
+# default = true
+resourcePrefetchEnabled: true
+
+# Automatic idle shutdown sweep (failsafe)
+# Periodically checks all managed servers and schedules idle shutdowns if they are empty.
+# This safeguards against missed events or errors preventing scheduling.
+# Set to 0 or negative to disable.
+# default = 60
+idleShutdownCheckInterval: 60
 
 # Panel configuration
 pterodactyl:
