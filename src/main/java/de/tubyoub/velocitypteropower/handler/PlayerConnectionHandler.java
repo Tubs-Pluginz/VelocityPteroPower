@@ -84,6 +84,16 @@ public class PlayerConnectionHandler {
     boolean isOnline = rateLimitTracker.canMakeRequest() && apiClient.isServerOnline(serverName, serverId);
 
     if (isOnline) {
+      // If the player is already connected to the target server, do not attempt a transfer
+      boolean alreadyOnTarget = player
+          .getCurrentServer()
+          .map(cs -> cs.getServer().getServerInfo().getName().equalsIgnoreCase(serverName))
+          .orElse(false);
+      if (alreadyOnTarget) {
+        logger.debug("Player {} is already connected to {}. Suppressing transfer.", player.getUsername(), serverName);
+        event.setResult(ServerPreConnectEvent.ServerResult.denied());
+        return;
+      }
       startingServers.remove(serverName);
       logger.debug("Server {} is online. Allowing connection for {}.", serverName, player.getUsername());
       return;
@@ -155,6 +165,22 @@ public class PlayerConnectionHandler {
     boolean hasBypass = configurationManager.isMaxOnlineAllowBypass() && player.hasPermission("ptero.maxcap.bypass");
     if (maxOnline > 0 && !hasBypass) {
       java.util.Set<String> exempt = new java.util.HashSet<>(configurationManager.getMaxOnlineExemptList());
+      // Optionally exclude lobbies/limbos from the cap based on config
+      if (!configurationManager.isCountLobbiesInMaxOnline()) {
+        java.util.List<String> lobbies = configurationManager.getBalancerLobbies();
+        int use = Math.max(0, configurationManager.getBalancerLobbiesToUse());
+        if (lobbies != null && !lobbies.isEmpty()) {
+          if (use > 0 && use < lobbies.size()) {
+            exempt.addAll(lobbies.subList(0, use));
+          } else {
+            exempt.addAll(lobbies);
+          }
+        }
+      }
+      if (!configurationManager.isCountLimbosInMaxOnline()) {
+        java.util.List<String> limbos = configurationManager.getBalancerLimbos();
+        if (limbos != null) exempt.addAll(limbos);
+      }
       if (!exempt.contains(serverName)) {
         int onlineCount = plugin.getServerLifecycleManager().countOnlineServersExcluding(exempt);
         if (onlineCount >= maxOnline && onlineCount != -1) {
@@ -184,20 +210,33 @@ public class PlayerConnectionHandler {
 
     if (limboServerOpt.isPresent()) {
       RegisteredServer limboServer = limboServerOpt.get();
-      logger.info(
-          "Redirecting player {} to limbo server '{}' while server '{}' starts.",
-          player.getUsername(),
-          limboServer.getServerInfo().getName(),
-          serverName);
-      player.sendMessage(
-          messagesManager.prefixed(
-              MessageKey.CONNECT_REDIRECTING_TO_LIMBO,
-              "server",
-              serverName,
-              "limbo",
-              limboServer.getServerInfo().getName()));
-      event.setResult(ServerPreConnectEvent.ServerResult.allowed(limboServer));
-      scheduleDelayedConnect(player, serverName, serverInfo);
+      // If the player is already on the selected limbo, avoid re-sending them there to prevent Velocity errors
+      boolean alreadyOnLimbo = event.getPreviousServer() != null && event.getPreviousServer().equals(limboServer);
+      if (alreadyOnLimbo) {
+        logger.debug("Player {} is already on limbo '{}'. Keeping them there while '{}' starts.",
+            player.getUsername(), limboServer.getServerInfo().getName(), serverName);
+        // Do not change the server; just deny the switch and keep the player where they are
+        player.sendMessage(
+            messagesManager.prefixed(
+                MessageKey.CONNECT_SERVER_STARTING, "server", serverName));
+        event.setResult(ServerPreConnectEvent.ServerResult.denied());
+        scheduleDelayedConnect(player, serverName, serverInfo);
+      } else {
+        logger.info(
+            "Redirecting player {} to limbo server '{}' while server '{}' starts.",
+            player.getUsername(),
+            limboServer.getServerInfo().getName(),
+            serverName);
+        player.sendMessage(
+            messagesManager.prefixed(
+                MessageKey.CONNECT_REDIRECTING_TO_LIMBO,
+                "server",
+                serverName,
+                "limbo",
+                limboServer.getServerInfo().getName()));
+        event.setResult(ServerPreConnectEvent.ServerResult.allowed(limboServer));
+        scheduleDelayedConnect(player, serverName, serverInfo);
+      }
     } else {
       String baseMsgKey = MessageKey.CONNECT_STARTING_SERVER_DISCONNECT.getPath();
       if (event.getPreviousServer() == null) {
@@ -215,37 +254,18 @@ public class PlayerConnectionHandler {
   }
 
   private Optional<RegisteredServer> findValidLimboServer() {
-    String limboServerName = configurationManager.getLimboServerName();
-    if (limboServerName == null) {
-      logger.debug("Limbo server not configured.");
-      return Optional.empty();
-    }
-
-    Optional<RegisteredServer> limboOpt = proxyServer.getServer(limboServerName);
-    if (limboOpt.isEmpty()) {
-      logger.error("Configured limbo server '{}' is not registered with Velocity.", limboServerName);
-      return Optional.empty();
-    }
-
-    PteroServerInfo limboInfo = serverInfoMap.get(limboServerName);
-    if (limboInfo != null) {
-      if (!rateLimitTracker.canMakeRequest()) {
-        logger.warn("Rate limited. Cannot check or start VPP-managed limbo server '{}'.", limboServerName);
-        return Optional.empty();
+    // Try multi-lobby/limbo balancer first and only
+    try {
+      if (plugin.getLobbyBalancerManager() != null) {
+        Optional<RegisteredServer> hold = plugin.getLobbyBalancerManager().pickHoldingServer();
+        if (hold.isPresent()) {
+          return hold;
+        }
       }
-      if (!apiClient.isServerOnline(limboServerName, limboInfo.getServerId())) {
-        logger.warn(
-            "VPP-managed limbo server '{}' is offline. Attempting to start it, but cannot use it for redirection now.",
-            limboServerName);
-        apiClient.powerServer(limboInfo.getServerId(), PowerSignal.START);
-        return Optional.empty();
-      }
-      logger.debug("VPP-managed limbo server '{}' is online.", limboServerName);
-    } else {
-      logger.debug("Limbo server '{}' is registered but not managed by VPP. Assuming usable.", limboServerName);
+    } catch (Exception ex) {
+      logger.debug("Balancer selection failed: {}", ex.toString());
     }
-
-    return limboOpt;
+    return Optional.empty();
   }
 
   private void scheduleDelayedConnect(

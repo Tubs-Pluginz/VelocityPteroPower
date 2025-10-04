@@ -13,6 +13,7 @@ import de.tubyoub.velocitypteropower.command.PteroCommand;
 import de.tubyoub.velocitypteropower.handler.PlayerConnectionHandler;
 import de.tubyoub.velocitypteropower.lifecycle.ServerLifecycleManager;
 import de.tubyoub.velocitypteropower.listener.ServerSwitchListener;
+import de.tubyoub.velocitypteropower.lobby.LobbyBalancerManager;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
 import de.tubyoub.velocitypteropower.manager.MessagesManager;
 import de.tubyoub.velocitypteropower.manager.WhitelistManager;
@@ -59,6 +60,7 @@ public class VelocityPteroPower {
     private PlayerConnectionHandler playerConnectionHandler;
     private ServerLifecycleManager serverLifecycleManager;
     private ServerSwitchListener serverSwitchListener;
+    private LobbyBalancerManager lobbyBalancerManager;
 
     private FilteredComponentLogger filteredLogger;
 
@@ -113,6 +115,9 @@ public class VelocityPteroPower {
         this.serverLifecycleManager = new ServerLifecycleManager(proxyServer, this);
         this.playerConnectionHandler = new PlayerConnectionHandler(proxyServer, this);
         this.serverSwitchListener = new ServerSwitchListener(this, serverLifecycleManager);
+        // Initialize and start lobby/limbo balancer
+        this.lobbyBalancerManager = new LobbyBalancerManager(this);
+        this.lobbyBalancerManager.startSchedulers();
         // Schedule periodic enforcement of always-online servers
         this.serverLifecycleManager.scheduleAlwaysOnlineMaintenance();
         // Schedule periodic idle shutdown sweep (failsafe)
@@ -310,5 +315,9 @@ public class VelocityPteroPower {
 
     public Map<String, Long> getShutdownDeadlines() {
         return shutdownDeadlines;
+    }
+
+    public LobbyBalancerManager getLobbyBalancerManager() {
+        return lobbyBalancerManager;
     }
 }

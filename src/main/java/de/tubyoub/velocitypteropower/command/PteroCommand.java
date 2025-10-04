@@ -247,6 +247,22 @@ public class PteroCommand implements SimpleCommand {
                 boolean hasBypass = configurationManager.isMaxOnlineAllowBypass() && sender.hasPermission("ptero.maxcap.bypass");
                 if (maxOnline > 0 && !hasBypass) {
                     java.util.Set<String> exempt = new java.util.HashSet<>(configurationManager.getMaxOnlineExemptList());
+                    // Optionally exclude lobbies/limbos from the cap based on config
+                    if (!configurationManager.isCountLobbiesInMaxOnline()) {
+                        java.util.List<String> lobbies = configurationManager.getBalancerLobbies();
+                        int use = Math.max(0, configurationManager.getBalancerLobbiesToUse());
+                        if (lobbies != null && !lobbies.isEmpty()) {
+                            if (use > 0 && use < lobbies.size()) {
+                                exempt.addAll(lobbies.subList(0, use));
+                            } else {
+                                exempt.addAll(lobbies);
+                            }
+                        }
+                    }
+                    if (!configurationManager.isCountLimbosInMaxOnline()) {
+                        java.util.List<String> limbos = configurationManager.getBalancerLimbos();
+                        if (limbos != null) exempt.addAll(limbos);
+                    }
                     if (!exempt.contains(serverName)) {
                         int onlineCount = plugin.getServerLifecycleManager().countOnlineServersExcluding(exempt);
                         if (onlineCount >= maxOnline && onlineCount != -1) {

@@ -39,7 +39,6 @@ public class ConfigurationManager {
     private YamlDocument config;
     private String panelUrl;
     private String apiKey;
-    private String limboServer;
     private PanelType panel;
     private boolean checkUpdate;
     private boolean printRateLimit;
@@ -60,11 +59,28 @@ public class ConfigurationManager {
     private int maxOnlineServers;
     private boolean maxOnlineAllowBypass;
     private List<String> maxOnlineExemptList;
+    private boolean countLobbiesInMaxOnline;
+    private boolean countLimbosInMaxOnline;
     private List<String> alwaysOnlineList;
     private int alwaysOnlineCheckInterval;
     private int resourceCacheSeconds;
     private boolean resourcePrefetchEnabled;
     private int idleShutdownCheckInterval;
+
+    // Lobby/Limbo balancing configuration
+    private List<String> balancerLobbies;
+    private List<String> balancerLimbos;
+    private int balancerLobbiesToUse;
+    private String balancerStrategyName;
+    private int balancerHealthCheckInterval;
+    private boolean balancerAutoScaleEnabled;
+    private int balancerMinOnline;
+    private int balancerMaxOnline;
+    private int balancerPlayersPerServer;
+    private double balancerCpuScaleUpThreshold;
+    private int balancerPreStartThresholdPercent;
+    private int balancerStartFailureFallbackSeconds;
+    private int balancerStartFailureCooldownSeconds;
 
     private final VelocityPteroPower plugin;
     private final Logger logger;
@@ -103,6 +119,7 @@ public class ConfigurationManager {
                                         .addIgnoredRoute("8", "servers", '.')
                                         .addIgnoredRoute("9", "servers", '.')
                                         .addIgnoredRoute("10", "servers", '.')
+                                        .addIgnoredRoute("11", "servers", '.')
                                         .build());
 
 
@@ -124,13 +141,73 @@ public class ConfigurationManager {
             maxOnlineServers = (int) config.get("maxOnlineServers", 0);
             maxOnlineAllowBypass = (boolean) config.get("maxOnlineAllowBypass", true);
             maxOnlineExemptList = config.getStringList("maxOnlineExempt");
+            countLobbiesInMaxOnline = (boolean) config.get("countLobbiesInMaxOnline", false);
+            countLimbosInMaxOnline = (boolean) config.get("countLimbosInMaxOnline", false);
             alwaysOnlineList = config.getStringList("alwaysOnline");
             alwaysOnlineCheckInterval = (int) config.get("alwaysOnlineCheckInterval", 60);
             resourceCacheSeconds = (int) config.get("resourceCacheSeconds", 10);
             resourcePrefetchEnabled = (boolean) config.get("resourcePrefetchEnabled", true);
             idleShutdownCheckInterval = (int) config.get("idleShutdownCheckInterval", 60);
 
-            limboServer = (String) config.get("limboServer", "changeMe");
+            // Lobby/Limbo balancer section (all optional, sensible defaults)
+            Section lb = config.getSection("lobbyBalancer");
+            if (lb != null) {
+                balancerLobbies = lb.getStringList("lobbies");
+                balancerLimbos = lb.getStringList("limbos");
+                balancerLobbiesToUse = lb.getInt("lobbiesToUse", 0);
+                String strat = lb.getString("strategy", "ROUND_ROBIN");
+                balancerStrategyName = strat != null ? strat : "ROUND_ROBIN";
+                balancerHealthCheckInterval = lb.getInt("healthCheckInterval", 15);
+                balancerAutoScaleEnabled = lb.getBoolean("autoScaleEnabled", true);
+                balancerMinOnline = lb.getInt("minOnline", 1);
+                balancerMaxOnline = lb.getInt("maxOnline", 0);
+                balancerPlayersPerServer = lb.getInt("playersPerServer", 80);
+                try {
+                    balancerCpuScaleUpThreshold = lb.getDouble("cpuScaleUpThreshold", 85.0);
+                } catch (Exception ex) {
+                    balancerCpuScaleUpThreshold = 85.0;
+                }
+                balancerPreStartThresholdPercent = lb.getInt("preStartThresholdPercent", 80);
+                balancerStartFailureFallbackSeconds = lb.getInt("startFailureFallbackSeconds", 60);
+                balancerStartFailureCooldownSeconds = lb.getInt("startFailureCooldownSeconds", 120);
+            } else {
+                // defaults
+                balancerLobbies = Collections.emptyList();
+                balancerLimbos = Collections.emptyList();
+                balancerLobbiesToUse = 0;
+                balancerStrategyName = "ROUND_ROBIN";
+                balancerHealthCheckInterval = 15;
+                balancerAutoScaleEnabled = true;
+                balancerMinOnline = 1;
+                balancerMaxOnline = 0;
+                balancerPlayersPerServer = 80;
+                balancerCpuScaleUpThreshold = 85.0;
+                balancerPreStartThresholdPercent = 80;
+                balancerStartFailureFallbackSeconds = 60;
+                balancerStartFailureCooldownSeconds = 120;
+            }
+
+            // Migrate legacy 'limboServer' to 'lobbyBalancer.limbos'
+            try {
+                String legacyLimbo = config.getString("limboServer");
+                if (legacyLimbo != null && !legacyLimbo.isBlank() && !"changeMe".equalsIgnoreCase(legacyLimbo)) {
+                    Section lbSec = config.getSection("lobbyBalancer");
+                    if (lbSec == null) {
+                        config.set("lobbyBalancer.limbos", java.util.List.of(legacyLimbo));
+                    } else {
+                        java.util.List<String> limbos = lbSec.getStringList("limbos");
+                        if (limbos == null) limbos = new java.util.ArrayList<>();
+                        boolean exists = false;
+                        for (String s : limbos) { if (s.equalsIgnoreCase(legacyLimbo)) { exists = true; break; } }
+                        if (!exists) limbos.add(0, legacyLimbo);
+                        config.set("lobbyBalancer.limbos", limbos);
+                    }
+                    config.remove(Route.fromString("limboServer"));
+                    config.save();
+                    logger.info("Migrated legacy 'limboServer' to 'lobbyBalancer.limbos' and removed the old key.");
+                }
+            } catch (Exception ignored) {}
+
             stopAllIgnoreList = config.getStringList("stopIdleIgnore");
 
             String checkMethodStr = config.getString("serverStatusCheckMethod", "VELOCITY_PING");
@@ -185,19 +262,32 @@ public class ConfigurationManager {
                 Object serverInfoDataObj = serversSection.get(route);
                 if (serverInfoDataObj instanceof Section) {
                     Section serverInfoDataSection = (Section) serverInfoDataObj;
-                    Map<String, Object> serverInfoData = new HashMap<>();
-                    for (Object dataKeyObj : serverInfoDataSection.getKeys()) {
-                        String dataKey = (String) dataKeyObj;
-                        Route dataRoute = Route.fromString(dataKey);
-                        Object value = serverInfoDataSection.get(dataRoute);
-                        serverInfoData.put(dataKey, value);
-                    }
                     try {
-                        String id = (String) serverInfoData.get("id");
+                        Object idObj = serverInfoDataSection.get("id");
+                        if (idObj == null) {
+                            throw new IllegalArgumentException("Missing 'id' for server '" + key + "'");
+                        }
+
+                        if (!(idObj instanceof String)) {
+                            // YAML likely parsed an unquoted ID (e.g., 91e62747) as a number (scientific notation),
+                            // which can overflow to Infinity. We cannot recover the original text.
+                            throw new IllegalArgumentException("Invalid type for 'id' (" + idObj.getClass().getSimpleName() + ") at path 'servers." + key + ".id'. YAML parsed an unquoted value as a number. Edit your config and quote the ID, e.g.: id: \"91e62747\" then restart/reload.");
+                        }
+
+                        String id = ((String) idObj).trim();
+                        if (id.equalsIgnoreCase("infinity") || id.equalsIgnoreCase("nan") || id.isEmpty()) {
+                            throw new IllegalArgumentException("Invalid 'id' value '" + id + "' for server '" + key + "'. Quote the ID in YAML, e.g.: id: \"91e62747\"");
+                        }
+
+                        // Basic sanity check: IDs are typically short alphanumeric (pterodactyl short uuid)
+                        if (!id.matches("^[A-Za-z0-9_-]{4,64}$")) {
+                            logger.warn("Suspicious server id '{}' for server '{}'. Expected alphanumeric/underscore/dash. Continuing anyway.", id, key);
+                        }
+
                         if (!Objects.equals(id, "1234abcd")){
-                            int timeout = (int) serverInfoData.getOrDefault("timeout", -1);
-                            int startupJoinDelay = (int) serverInfoData.getOrDefault("startupJoinDelay", 10);
-                            boolean whitelist = (boolean) serverInfoData.getOrDefault("whitelist", false);
+                            int timeout = serverInfoDataSection.getInt("timeout", -1);
+                            int startupJoinDelay = serverInfoDataSection.getInt("startupJoinDelay", 10);
+                            boolean whitelist = serverInfoDataSection.getBoolean("whitelist", false);
                             serverInfoMap.put(key, new PteroServerInfo(id, timeout, startupJoinDelay, whitelist));
                             logger.info("Registered Server: " + id + " successfully");
                         }
@@ -243,6 +333,21 @@ public class ConfigurationManager {
     public Map<String, PteroServerInfo> getServerInfoMap() {
         return serverInfoMap;
     }
+
+    // Balancer getters
+    public List<String> getBalancerLobbies() { return balancerLobbies == null ? Collections.emptyList() : balancerLobbies; }
+    public List<String> getBalancerLimbos() { return balancerLimbos == null ? Collections.emptyList() : balancerLimbos; }
+    public int getBalancerLobbiesToUse() { return balancerLobbiesToUse; }
+    public String getBalancerStrategyName() { return balancerStrategyName == null ? "ROUND_ROBIN" : balancerStrategyName; }
+    public int getBalancerHealthCheckInterval() { return balancerHealthCheckInterval <= 0 ? 15 : balancerHealthCheckInterval; }
+    public boolean isBalancerAutoScaleEnabled() { return balancerAutoScaleEnabled; }
+    public int getBalancerMinOnline() { return Math.max(0, balancerMinOnline); }
+    public int getBalancerMaxOnline() { return Math.max(0, balancerMaxOnline); }
+    public int getBalancerPlayersPerServer() { return Math.max(1, balancerPlayersPerServer); }
+    public double getBalancerCpuScaleUpThreshold() { return balancerCpuScaleUpThreshold <= 0 ? 85.0 : balancerCpuScaleUpThreshold; }
+    public int getBalancerPreStartThresholdPercent() { return balancerPreStartThresholdPercent <= 0 ? 80 : Math.min(100, balancerPreStartThresholdPercent); }
+    public int getBalancerStartFailureFallbackSeconds() { return balancerStartFailureFallbackSeconds <= 0 ? 60 : balancerStartFailureFallbackSeconds; }
+    public int getBalancerStartFailureCooldownSeconds() { return balancerStartFailureCooldownSeconds <= 0 ? 120 : balancerStartFailureCooldownSeconds; }
 
     /**
      * This method returns the Pterodactyl URL.
@@ -331,12 +436,6 @@ public class ConfigurationManager {
         return whitelistCheckInterval;
     }
 
-    public String getLimboServerName() {
-        if (limboServer == "changeMe") {
-            return null;
-        }
-        return limboServer;
-    }
 
     public List<String> getStopAllIgnoreList() {
         return stopAllIgnoreList;
@@ -357,6 +456,9 @@ public class ConfigurationManager {
     public java.util.List<String> getMaxOnlineExemptList() {
         return maxOnlineExemptList == null ? java.util.Collections.emptyList() : maxOnlineExemptList;
     }
+
+    public boolean isCountLobbiesInMaxOnline() { return countLobbiesInMaxOnline; }
+    public boolean isCountLimbosInMaxOnline() { return countLimbosInMaxOnline; }
 
     public java.util.List<String> getAlwaysOnlineList() {
         return alwaysOnlineList == null ? java.util.Collections.emptyList() : alwaysOnlineList;
