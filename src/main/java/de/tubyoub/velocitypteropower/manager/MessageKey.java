@@ -24,6 +24,8 @@ public enum MessageKey {
     COMMAND_RATE_LIMIT_EXCEEDED("command.rate-limit-exceeded"),
     COMMAND_STOPPING_ALL_SERVERS("command.stopping-all-servers"),
     COMMAND_FORCE_STOPPING_ALL_SERVERS("command.force-stopping-all-servers"),
+    COMMAND_FORCE_STARTING_ALL_SERVERS("command.force-starting-all-servers"),
+    COMMAND_FORCE_START_WARNING("command.force-start-warning"),
     COMMAND_HELP_HEADER("command.help-header"),
     COMMAND_COOLDOWN_ACTIVE("command.cooldown-active"),
     COMMAND_LIST_HEADER("command.list-header"),

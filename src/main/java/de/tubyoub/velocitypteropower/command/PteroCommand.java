@@ -114,6 +114,14 @@ public class PteroCommand implements SimpleCommand {
                 }
                 break;
 
+            case "forcestartall":
+                if (sender.hasPermission("ptero.forcestartall")) {
+                    forceStartAll(sender, args);
+                } else {
+                    sender.sendMessage(messages.prefixed(MessageKey.COMMAND_NO_PERMISSION));
+                }
+                break;
+
             case "list":
                 if (sender.hasPermission("ptero.list")) {
                     listServers(sender);
@@ -228,6 +236,53 @@ public class PteroCommand implements SimpleCommand {
             sender.sendMessage(
                     messages.prefixed(
                             MessageKey.COMMAND_FORCE_STOPPING_ALL_SERVERS, "count", String.valueOf(stoppedCount)));
+        }
+    }
+
+    private void forceStartAll(CommandSource sender, String[] args) {
+        if (args.length > 1 && args[1].equalsIgnoreCase("confirm")) {
+            if (sender instanceof com.velocitypowered.api.proxy.Player p) {
+                UUID id = p.getUniqueId();
+                Long at = pendingForceStopConfirmations.get(id);
+                if (at != null && System.currentTimeMillis() - at < CONFIRMATION_TIMEOUT_MS) {
+                    pendingForceStopConfirmations.remove(id);
+                    forceStartAllServers(sender);
+                } else {
+                    sender.sendMessage(messages.prefixed(MessageKey.GENERIC_ERROR, "message", "No pending confirmation."));
+                }
+            } else {
+                forceStartAllServers(sender);
+            }
+            return;
+        }
+        if (sender instanceof com.velocitypowered.api.proxy.Player p) {
+            pendingForceStopConfirmations.put(p.getUniqueId(), System.currentTimeMillis());
+        }
+        // Strong warning about resource usage
+        sender.sendMessage(messages.prefixed(MessageKey.COMMAND_FORCE_START_WARNING));
+        sender.sendMessage(messages.prefixed(MessageKey.COMMAND_FORCE_STARTING_ALL_SERVERS, "count", "ALL"));
+        sender.sendMessage(Component.text("Type '/ptero forcestartall confirm' to confirm."));
+    }
+
+    private void forceStartAllServers(CommandSource sender) {
+        Map<String, PteroServerInfo> serverInfoMap = plugin.getServerInfoMap();
+        if (serverInfoMap.isEmpty()) {
+            sender.sendMessage(messages.prefixed(MessageKey.COMMAND_NO_SERVERS_FOUND));
+            return;
+        }
+        int started = 0;
+        for (Map.Entry<String, PteroServerInfo> entry : serverInfoMap.entrySet()) {
+            PteroServerInfo serverInfo = entry.getValue();
+            if (rateLimitTracker.canMakeRequest()) {
+                apiClient.powerServer(serverInfo.getServerId(), PowerSignal.START);
+                started++;
+            } else {
+                sender.sendMessage(messages.prefixed(MessageKey.COMMAND_RATE_LIMIT_EXCEEDED));
+                break;
+            }
+        }
+        if (started > 0) {
+            sender.sendMessage(messages.prefixed(MessageKey.COMMAND_FORCE_STARTING_ALL_SERVERS, "count", String.valueOf(started)));
         }
     }
 
@@ -642,22 +697,57 @@ public class PteroCommand implements SimpleCommand {
 
     @Override
     public List<String> suggest(Invocation invocation) {
-        String[] currentArgs = invocation.arguments();
+        CommandSource sender = invocation.source();
+        String[] args = invocation.arguments();
+        String current = args.length > 0 ? args[0].toLowerCase(Locale.ROOT) : "";
 
-        if (currentArgs.length <= 1) {
-            return Arrays.asList(
-                    "start", "stop", "restart", "list", "info", "stopidle", "whitelistReload", "reload", "forcestopall");
-        } else if (currentArgs.length == 2) {
-            String sub = currentArgs[0].toLowerCase(Locale.ROOT);
-            if (sub.equals("start") || sub.equals("stop") || sub.equals("restart") || sub.equals("info")) {
-                if (plugin.getServerInfoMap() != null) {
-                    return plugin.getServerInfoMap().keySet().stream()
-                            .filter(name -> name.startsWith(currentArgs[1]))
+        // Root subcommand suggestions
+        if (args.length <= 1) {
+            List<String> subs = new ArrayList<>();
+            if (sender.hasPermission("ptero.start")) subs.add("start");
+            if (sender.hasPermission("ptero.stop")) subs.add("stop");
+            if (sender.hasPermission("ptero.restart")) subs.add("restart");
+            if (sender.hasPermission("ptero.list")) subs.add("list");
+            if (sender.hasPermission("ptero.info")) subs.add("info");
+            if (sender.hasPermission("ptero.stopIdle")) subs.add("stopidle");
+            if (sender.hasPermission("ptero.whitelistReload")) subs.add("whitelistReload");
+            if (sender.hasPermission("ptero.reload")) subs.add("reload");
+            if (sender.hasPermission("ptero.forcestopall")) subs.add("forcestopall");
+            if (sender.hasPermission("ptero.forcestartall")) subs.add("forcestartall");
+
+            if (current.isEmpty()) return subs;
+            final String prefix = current;
+            return subs.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+        }
+
+        // Second argument suggestions (server names)
+        if (args.length == 2) {
+            String sub = args[0].toLowerCase(Locale.ROOT);
+            boolean needsServer = sub.equals("start") || sub.equals("stop") || sub.equals("restart") || sub.equals("info");
+            if (needsServer) {
+                if ((sub.equals("start") && !sender.hasPermission("ptero.start"))
+                        || (sub.equals("stop") && !sender.hasPermission("ptero.stop"))
+                        || (sub.equals("restart") && !sender.hasPermission("ptero.restart"))
+                        || (sub.equals("info") && !sender.hasPermission("ptero.info"))) {
+                    return java.util.Collections.emptyList();
+                }
+                String prefix = args[1];
+                Map<String, PteroServerInfo> map = plugin.getServerInfoMap();
+                if (map != null && !map.isEmpty()) {
+                    return map.keySet().stream()
+                            .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(prefix.toLowerCase(Locale.ROOT)))
+                            .sorted(String.CASE_INSENSITIVE_ORDER)
                             .collect(Collectors.toList());
                 }
+            } else if (sub.equals("forcestopall") || sub.equals("forcestartall")) {
+                // Suggest the confirmation token
+                if (!sender.hasPermission("ptero." + sub)) return java.util.Collections.emptyList();
+                String prefix = args[1].toLowerCase(Locale.ROOT);
+                return java.util.List.of("confirm").stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
             }
         }
-        return Collections.emptyList();
+
+        return java.util.Collections.emptyList();
     }
 
     private void displayHelp(CommandSource sender) {
@@ -669,6 +759,7 @@ public class PteroCommand implements SimpleCommand {
         sender.sendMessage(Component.text("/ptero info <serverName>"));
         sender.sendMessage(Component.text("/ptero stopidle"));
         sender.sendMessage(Component.text("/ptero forcestopall"));
+        sender.sendMessage(Component.text("/ptero forcestartall"));
         sender.sendMessage(Component.text("/ptero whitelistReload"));
         sender.sendMessage(Component.text("/ptero reload"));
         sender.sendMessage(Component.text("/ptero help"));

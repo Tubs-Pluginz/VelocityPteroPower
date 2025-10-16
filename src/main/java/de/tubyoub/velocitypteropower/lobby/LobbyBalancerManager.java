@@ -196,12 +196,24 @@ public class LobbyBalancerManager {
             logger.warn("Cannot auto-start '{}': not managed by VPP (no panel id in config).", serverName);
             return false;
         }
+        // Throttle repeat start attempts for the same lobby to avoid spamming panel/API and logs
+        Long last = lastStartAttempt.get(serverName);
+        int minGapSec = Math.max(5, config.getBalancerStartFailureFallbackSeconds());
+        if (last != null && (now - last) < (minGapSec * 1000L)) {
+            logger.debug("Skipping start for '{}' (last attempt {}s ago).", serverName, (now - last) / 1000);
+            return false;
+        }
         if (!plugin.getRateLimitTracker().canMakeRequest()) {
             logger.warn("Rate limited. Cannot start lobby '{}' right now.", serverName);
             return false;
         }
-        if (apiClient.isServerOnline(serverName, info.getServerId())) {
-            return true;
+        // If already online/reachable, no need to send start again
+        try {
+            if (apiClient.isServerOnline(serverName, info.getServerId())) {
+                return true;
+            }
+        } catch (Exception ignored) {
+            // If the check fails due to transient issues, fall through to attempt start once per throttle window
         }
         logger.info("Starting lobby '{}' ({}).", serverName, info.getServerId());
         apiClient.powerServer(info.getServerId(), PowerSignal.START);

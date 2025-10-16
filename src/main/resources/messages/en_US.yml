@@ -1,5 +1,5 @@
 # VelocityPteroPower messages - English (US), MiniMessage
-fileversion: 1
+fileversion: 2
 
 # Use MiniMessage for styling. You can add gradients, hover, click, etc.
 # Example gradient prefix:
@@ -22,6 +22,8 @@ command:
   rate-limit-exceeded: "<red>API rate limit exceeded. Not all servers could be stopped.</red>"
   stopping-all-servers: "<gray>Stopping all</gray> <yellow><count></yellow> <gray>servers. This may take some time.</gray>"
   force-stopping-all-servers: "<gray>Force-stopping</gray> <yellow><count></yellow> <gray>servers. This may take some time.</gray>"
+  force-starting-all-servers: "<gray>Force-starting</gray> <yellow><count></yellow> <gray>servers. This may use a lot of resources.</gray>"
+  force-start-warning: "<red>Warning:</red> <gray>This will start ALL managed backend servers. Ensure your host has enough resources to handle this load.</gray>"
   cooldown-active: "<yellow>You are on cooldown. Please wait <timeout> seconds before trying again.</yellow>"
   help-header: "<green>VelocityPteroPower commands:</green>"
   list-header: "<gradient:#42A5F5:#00E5FF><bold>Managed Servers</bold></gradient> <gray>(status | players | TTL)</gray>"

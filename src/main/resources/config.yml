@@ -4,7 +4,7 @@
 ################################
 
 # Version of the configuration file
-fileversion: 11
+fileversion: 12
 
 # Check for updates
 # If true, the plugin will check for updates on startup.
@@ -146,6 +146,14 @@ resourcePrefetchEnabled: true
 # Set to 0 or negative to disable.
 # default = 60
 idleShutdownCheckInterval: 60
+
+# Lifecycle related behavior
+lifecycle:
+  # When the proxy shuts down, stop these servers.
+  # Use "all" to stop all managed servers, or provide a list of specific server names.
+  # This overrides 'alwaysOnline' during shutdown.
+  shutdownOnProxyExit:
+    - all
 
 # Multi-lobby/limbo balancer settings
 lobbyBalancer:

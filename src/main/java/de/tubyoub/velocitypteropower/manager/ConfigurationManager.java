@@ -67,6 +67,9 @@ public class ConfigurationManager {
     private boolean resourcePrefetchEnabled;
     private int idleShutdownCheckInterval;
 
+    // Lifecycle
+    private List<String> shutdownOnProxyExitList;
+
     // Lobby/Limbo balancing configuration
     private List<String> balancerLobbies;
     private List<String> balancerLimbos;
@@ -120,6 +123,7 @@ public class ConfigurationManager {
                                         .addIgnoredRoute("9", "servers", '.')
                                         .addIgnoredRoute("10", "servers", '.')
                                         .addIgnoredRoute("11", "servers", '.')
+                                        .addIgnoredRoute("12", "servers", '.')
                                         .build());
 
 
@@ -148,6 +152,14 @@ public class ConfigurationManager {
             resourceCacheSeconds = (int) config.get("resourceCacheSeconds", 10);
             resourcePrefetchEnabled = (boolean) config.get("resourcePrefetchEnabled", true);
             idleShutdownCheckInterval = (int) config.get("idleShutdownCheckInterval", 60);
+
+            // Lifecycle section
+            Section lifecycle = config.getSection("lifecycle");
+            if (lifecycle != null) {
+                shutdownOnProxyExitList = lifecycle.getStringList("shutdownOnProxyExit");
+            } else {
+                shutdownOnProxyExitList = java.util.Collections.emptyList();
+            }
 
             // Lobby/Limbo balancer section (all optional, sensible defaults)
             Section lb = config.getSection("lobbyBalancer");
@@ -478,5 +490,9 @@ public class ConfigurationManager {
 
     public int getIdleShutdownCheckInterval() {
         return Math.max(0, idleShutdownCheckInterval);
+    }
+
+    public java.util.List<String> getShutdownOnProxyExitList() {
+        return shutdownOnProxyExitList == null ? java.util.Collections.emptyList() : shutdownOnProxyExitList;
     }
 }

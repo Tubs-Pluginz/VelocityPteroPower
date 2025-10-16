@@ -16,6 +16,7 @@ import de.tubyoub.velocitypteropower.listener.ServerSwitchListener;
 import de.tubyoub.velocitypteropower.lobby.LobbyBalancerManager;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
 import de.tubyoub.velocitypteropower.manager.MessagesManager;
+import de.tubyoub.velocitypteropower.manager.MessageKey;
 import de.tubyoub.velocitypteropower.manager.WhitelistManager;
 import de.tubyoub.velocitypteropower.model.PteroServerInfo;
 import de.tubyoub.velocitypteropower.service.UpdateService;
@@ -123,6 +124,26 @@ public class VelocityPteroPower {
         this.lobbyBalancerManager.startSchedulers();
         // Schedule periodic enforcement of always-online servers
         this.serverLifecycleManager.scheduleAlwaysOnlineMaintenance();
+        // Trigger an immediate always-online enforcement once at startup
+        var always = configurationManager.getAlwaysOnlineList();
+        if (always != null && !always.isEmpty()) {
+            proxyServer.getScheduler().buildTask(this, () -> {
+                try {
+                    for (String name : always) {
+                        PteroServerInfo info = serverInfoMap.get(name);
+                        if (info == null) continue;
+                        try {
+                            if (!apiClient.isServerOnline(name, info.getServerId())) {
+                                filteredLogger.info(messagesManager.mm(MessageKey.POWER_ACTION_SENT, java.util.Map.of("action", "start", "server", name)));
+                                apiClient.powerServer(info.getServerId(), PowerSignal.START);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                } catch (Exception ex) {
+                    filteredLogger.debug("Startup always-online start failed: {}", ex.toString());
+                }
+            }).schedule();
+        }
         // Schedule periodic idle shutdown sweep (failsafe)
         this.serverLifecycleManager.scheduleIdleShutdownSweep();
 
@@ -169,10 +190,35 @@ public class VelocityPteroPower {
 
     @Subscribe
     public void onProxyShutdown(ProxyShutdownEvent event) {
-        if (apiClient != null) {
-            apiClient.shutdown();
+        try {
+            var list = configurationManager.getShutdownOnProxyExitList();
+            if (list != null && !list.isEmpty() && serverInfoMap != null) {
+                boolean all = list.stream().anyMatch(s -> s.equalsIgnoreCase("all"));
+                int count = 0;
+                for (Map.Entry<String, PteroServerInfo> e : serverInfoMap.entrySet()) {
+                    String name = e.getKey();
+                    if (!all && list.stream().noneMatch(s -> s.equalsIgnoreCase(name))) {
+                        continue;
+                    }
+                    try {
+                        apiClient.powerServer(e.getValue().getServerId(), PowerSignal.STOP);
+                        count++;
+                    } catch (Exception ex) {
+                        filteredLogger.warn("Failed sending stop on shutdown for {}: {}", name, ex.toString());
+                    }
+                }
+                if (count > 0) {
+                    filteredLogger.info(messagesManager.mm(MessageKey.COMMAND_STOPPING_ALL_SERVERS, java.util.Map.of("count", String.valueOf(count))));
+                }
+            }
+        } catch (Exception ex) {
+            filteredLogger.warn("Error during shutdown stop sequence: {}", ex.toString());
+        } finally {
+            if (apiClient != null) {
+                apiClient.shutdown();
+            }
+            filteredLogger.info("Shutting down VelocityPteroPower... Goodbye!");
         }
-        filteredLogger.info("Shutting down VelocityPteroPower... Goodbye!");
     }
 
     public void reload() {
