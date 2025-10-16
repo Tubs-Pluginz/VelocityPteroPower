@@ -1,13 +1,9 @@
 name: Modrinth Publish
 
 on:
-  push:
-    branches: ['**'] # every branch → alpha build
-    paths-ignore:
-      - 'workflows/**'
-      - 'README.md'
   release:
-    types: [published] # when you publish a GitHub release
+    types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -25,24 +21,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Distinguish between alpha (commit) and beta (release)
-      - name: Determine build type
-        id: type
+      - name: Build with Maven (beta profile)
         run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            echo "type=beta" >> "$GITHUB_OUTPUT"
-            echo "profile=beta" >> "$GITHUB_OUTPUT"
-          else
-            echo "type=alpha" >> "$GITHUB_OUTPUT"
-            echo "profile=default" >> "$GITHUB_OUTPUT"
-          fi
+          mvn -B -V -e -DskipTests package -Pbeta
 
-      # Build with Maven, optionally activating the beta profile
-      - name: Build with Maven (shade)
-        run: |
-          mvn -B -V -e -DskipTests package -P${{ steps.type.outputs.profile }}
-
-      # Get version from pom.xml and shorten commit SHA
       - name: Determine version
         id: meta
         run: |
@@ -53,17 +35,17 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "artifact=target/$(ls target | grep -E '\.jar$' | head -n1)" >> "$GITHUB_OUTPUT"
 
-      # Always-upload step
-      - name: Publish to Modrinth
+      - name: Publish to Modrinth (beta)
         uses: WiIIiam278/mc-publish@hangar
         with:
           modrinth-id: 1dDr5J4w
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-featured: true
           files-primary: ${{ steps.meta.outputs.artifact }}
           name: VelocityPteroPower v${{ steps.meta.outputs.version }}
           version: ${{ steps.meta.outputs.version }}
-          version-type: ${{ steps.type.outputs.type }}
-          changelog: ${{ github.event.head_commit.message || github.event.release.body }}
+          version-type: beta
+          changelog: ${{ github.event.release.body || github.event.head_commit.message }}
           loaders: |
             velocity
           game-versions: |

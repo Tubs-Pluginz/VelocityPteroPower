@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: modrinth-alpha-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -28,25 +32,61 @@ jobs:
         run: |
           mvn -B -V -e -DskipTests package
 
-      - name: Determine version
+      - name: Determine version and rename artifact
         id: meta
         run: |
+          set -euo pipefail
           POM_VERSION=$(mvn -q -Dexec.executable=echo \
             -Dexec.args='${project.version}' \
             --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
           VERSION="${POM_VERSION}-${SHORT_SHA}"
 
-          # Find the built JAR (first .jar in /target)
-          JAR_FILE=$(ls target | grep -E '\.jar$' | head -n1)
-          NEW_FILE="VelocityPteroPower-${VERSION}.jar"
-
-          # Rename the jar so the filename includes version + commit
-          mv "target/${JAR_FILE}" "target/${NEW_FILE}"
+          # Prefer an explicit match; ignore -original jars if present
+          shopt -s nullglob
+          FILES=(target/VelocityPteroPower-*.jar)
+          FILTERED=()
+          for f in "${FILES[@]}"; do [[ "$f" != *-original.jar ]] && FILTERED+=("$f"); done
+          if [ ${#FILTERED[@]} -lt 1 ]; then
+            echo "No JARs found matching target/VelocityPteroPower-*.jar"
+            ls -l target || true
+            exit 1
+          fi
+          SRC="${FILTERED[0]}"
+          DST="target/VelocityPteroPower-${VERSION}.jar"
+          mv "$SRC" "$DST"
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "artifact=target/${NEW_FILE}" >> "$GITHUB_OUTPUT"
+          echo "artifact=${DST}" >> "$GITHUB_OUTPUT"
+
+      - name: Build alpha changelog text
+        id: changelog
+        run: |
+          set -euo pipefail
+          {
+            echo "## ⚠️ Alpha build"
+            echo
+            echo "> This build is generated automatically on every commit and may be unstable or untested."
+            echo "> Need help? Join the Discord: https://discord.pluginz.dev"
+            echo
+            echo "### What's in testing (commits in this push)"
+            # List commits included in this push event
+            jq -r '.commits[] | "- " + .id[0:7] + " " + (.message | gsub("\r?\n"; " ")) + " (" + (.author.username // .author.name // "unknown") + ")"' \
+              "$GITHUB_EVENT_PATH" || true
+            echo
+            echo "### Links"
+            echo "- Branch history: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
+            echo "- This commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+            echo "- Compare (last 20): https://github.com/${GITHUB_REPOSITORY}/compare/${GITHUB_REF_NAME}~20...${GITHUB_REF_NAME}"
+          } > changelog.md
+
+          # Escape for multiline output
+          CONTENT="$(cat changelog.md)"
+          CONTENT="${CONTENT//'%'/'%25'}"
+          CONTENT="${CONTENT//$'\n'/'%0A'}"
+          CONTENT="${CONTENT//$'\r'/'%0D'}"
+          echo "text=$CONTENT" >> "$GITHUB_OUTPUT"
 
       - name: Publish to Modrinth (alpha)
         uses: WiIIiam278/mc-publish@hangar
@@ -55,16 +95,12 @@ jobs:
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           modrinth-featured: false
 
-          # Upload the renamed file
           files-primary: ${{ steps.meta.outputs.artifact }}
 
-          # 🧩 Release metadata
           name: VelocityPteroPower Alpha • ${{ steps.meta.outputs.short_sha }}
           version: ${{ steps.meta.outputs.version }}
           version-type: alpha
-          changelog: |
-            **Commit:** [${{ steps.meta.outputs.short_sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
-            **Message:** ${{ github.event.head_commit.message }}
+          changelog: ${{ steps.changelog.outputs.text }}
 
           loaders: |
             velocity
