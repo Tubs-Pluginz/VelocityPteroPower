@@ -134,9 +134,9 @@ public class ServerLifecycleManager {
       clearRetryCount(serverName);
       plugin.getShutdownDeadlines().remove(serverName);
       logger.info(
-          messages.raw(MessageKey.SERVER_SHUTDOWN_CANCELLED)
-              .replace("<server>", serverName)
-              .replace("<reason>", reason));
+          messages.mm(
+              MessageKey.SERVER_SHUTDOWN_CANCELLED,
+              Map.of("server", serverName, "reason", reason)));
     } else {
       logger.debug("No pending shutdown task found for server '{}' to cancel.", serverName);
     }

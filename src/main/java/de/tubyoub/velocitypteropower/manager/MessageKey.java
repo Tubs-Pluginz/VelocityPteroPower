@@ -35,6 +35,7 @@ public enum MessageKey {
     // Connection flow
     CONNECT_UNMANAGED_SERVER("connect.unmanaged-server"),
     CONNECT_SERVER_STARTING("connect.server-starting"),
+    CONNECT_SERVER_STARTING_INITIATOR("connect.server-starting-initiator"),
     CONNECT_ERROR_RATE_LIMITED("connect.error-rate-limited"),
     CONNECT_REDIRECTING_TO_LIMBO("connect.redirecting-to-limbo"),
     CONNECT_STARTING_SERVER_DISCONNECT("connect.starting-server-disconnect"),

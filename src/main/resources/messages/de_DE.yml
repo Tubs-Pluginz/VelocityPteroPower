@@ -33,6 +33,7 @@ command:
 connect:
   unmanaged-server: "<red>Server nicht in der Konfiguration gefunden:</red> <yellow><server></yellow>"
   server-starting: "<yellow>Server '<server>' startet bereits.</yellow>"
+  server-starting-initiator: "<yellow>Du hast den Server '<server>' gestartet. Bitte warte, bis er hochgefahren ist...</yellow>"
   error-rate-limited: "<red>Serverstart verzögert sich aufgrund von API-Limits. Bitte warte oder versuche es später erneut.</red>"
   redirecting-to-limbo: "<gray>Server '<server>' startet. Du wirst zu</gray> <aqua><limbo></aqua> <gray>gesendet...</gray>"
   starting-server-disconnect: "<gray>Server '<server>' startet. Bitte versuche es in einem Moment erneut.</gray>"

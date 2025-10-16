@@ -52,7 +52,7 @@ public class ServerSwitchListener {
     RegisteredServer newServer = event.getServer();
     String newServerName = newServer.getServerInfo().getName();
 
-    serverLifecycleManager.cancelScheduledShutdown(newServerName, "player joined");
+    serverLifecycleManager.cancelScheduledShutdown(newServerName, "player " + event.getPlayer().getUsername() + " joined");
 
     event
         .getPreviousServer()

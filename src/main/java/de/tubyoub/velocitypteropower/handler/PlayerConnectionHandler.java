@@ -35,6 +35,7 @@ public class PlayerConnectionHandler {
   private final Map<String, PteroServerInfo> serverInfoMap;
   private final Set<String> startingServers;
   private final Map<UUID, Long> playerCooldowns;
+  private final Map<String, UUID> startInitiators;
 
   public PlayerConnectionHandler(ProxyServer proxyServer, VelocityPteroPower plugin) {
     this.proxyServer = proxyServer;
@@ -47,6 +48,7 @@ public class PlayerConnectionHandler {
     this.serverInfoMap = plugin.getServerInfoMap();
     this.startingServers = plugin.getStartingServers();
     this.playerCooldowns = plugin.getPlayerCooldowns();
+    this.startInitiators = plugin.getStartInitiators();
   }
 
   @Subscribe(priority = 10)
@@ -95,6 +97,8 @@ public class PlayerConnectionHandler {
         return;
       }
       startingServers.remove(serverName);
+      startInitiators.remove(serverName);
+      plugin.getStartingServersSince().remove(serverName);
       logger.debug("Server {} is online. Allowing connection for {}.", serverName, player.getUsername());
       return;
     }
@@ -138,14 +142,18 @@ public class PlayerConnectionHandler {
       String serverId,
       PteroServerInfo serverInfo) {
     if (startingServers.contains(serverName) && event.getPreviousServer() != null) {
-      player.sendMessage(
-          messagesManager.prefixed(
-              MessageKey.CONNECT_SERVER_STARTING, "server", serverName));
+      UUID initiator = startInitiators.get(serverName);
+      MessageKey key = (initiator != null && initiator.equals(player.getUniqueId()))
+          ? MessageKey.CONNECT_SERVER_STARTING_INITIATOR
+          : MessageKey.CONNECT_SERVER_STARTING;
+      player.sendMessage(messagesManager.prefixed(key, "server", serverName));
       event.setResult(ServerPreConnectEvent.ServerResult.denied());
       logger.debug(
           "Server {} is already starting. Denying connection for {}.",
           serverName,
           player.getUsername());
+      // Queue this player for automatic connection when the server is online
+      scheduleDelayedConnect(player, serverName, serverInfo);
       return;
     }
 
@@ -201,6 +209,8 @@ public class PlayerConnectionHandler {
           serverId,
           player.getUsername());
       startingServers.add(serverName);
+      startInitiators.putIfAbsent(serverName, player.getUniqueId());
+      plugin.getStartingServersSince().put(serverName, System.currentTimeMillis());
       playerCooldowns.put(player.getUniqueId(), System.currentTimeMillis());
       apiClient.powerServer(serverId, PowerSignal.START);
       scheduleInitialIdleCheck(serverName, serverId);
@@ -216,9 +226,13 @@ public class PlayerConnectionHandler {
         logger.debug("Player {} is already on limbo '{}'. Keeping them there while '{}' starts.",
             player.getUsername(), limboServer.getServerInfo().getName(), serverName);
         // Do not change the server; just deny the switch and keep the player where they are
-        player.sendMessage(
-            messagesManager.prefixed(
-                MessageKey.CONNECT_SERVER_STARTING, "server", serverName));
+        {
+          UUID initiator = startInitiators.get(serverName);
+          MessageKey key = (initiator != null && initiator.equals(player.getUniqueId()))
+              ? MessageKey.CONNECT_SERVER_STARTING_INITIATOR
+              : MessageKey.CONNECT_SERVER_STARTING;
+          player.sendMessage(messagesManager.prefixed(key, "server", serverName));
+        }
         event.setResult(ServerPreConnectEvent.ServerResult.denied());
         scheduleDelayedConnect(player, serverName, serverInfo);
       } else {
@@ -270,6 +284,7 @@ public class PlayerConnectionHandler {
 
   private void scheduleDelayedConnect(
       Player player, String targetServerName, PteroServerInfo targetServerInfo) {
+    String currentServer = player.getCurrentServer().toString();
     long initialDelay = configurationManager.getStartupInitialCheckDelay();
     long checkInterval = Math.max(5, targetServerInfo.getJoinDelay());
 
@@ -283,12 +298,24 @@ public class PlayerConnectionHandler {
 
               @Override
               public void run() {
+                if (!currentServer.equals(player.getCurrentServer())) {
+                    logger.info("Player {} already connected to a different Server: {}. Connection attempt to Server: {} is beeing aborted", 
+                            player.getUsername(), 
+                            player.getCurrentServer().toString(), 
+                            targetServerName);
+                    startingServers.remove(targetServerName);
+                    plugin.getStartingServersSince().remove(targetServerName);
+                    startInitiators.remove(targetServerName);
+                  return;
+                }
                 if (!player.isActive() || player.getCurrentServer().isEmpty()) {
                   logger.info(
                       "Player {} disconnected or left limbo while waiting for {}. Cancelling connect task.",
                       player.getUsername(),
                       targetServerName);
                   startingServers.remove(targetServerName);
+                  plugin.getStartingServersSince().remove(targetServerName);
+                  startInitiators.remove(targetServerName);
                   return;
                 }
 
@@ -310,6 +337,8 @@ public class PlayerConnectionHandler {
                         messagesManager.prefixed(
                             MessageKey.CONNECT_START_TIMEOUT, "server", targetServerName));
                     startingServers.remove(targetServerName);
+                    plugin.getStartingServersSince().remove(targetServerName);
+                    startInitiators.remove(targetServerName);
                   } else {
                     logger.debug(
                         "Server {} not online yet for player {}. Rescheduling check (Attempt {}/{}).",
@@ -342,6 +371,8 @@ public class PlayerConnectionHandler {
           messagesManager.prefixed(
               MessageKey.CONNECT_TARGET_SERVER_NOT_FOUND, "server", serverName));
       startingServers.remove(serverName);
+      plugin.getStartingServersSince().remove(serverName);
+      startInitiators.remove(serverName);
       return;
     }
 
@@ -353,6 +384,8 @@ public class PlayerConnectionHandler {
         .orElse(false)) {
       logger.debug("Player {} is already connected to {}. No action needed.", player.getUsername(), serverName);
       startingServers.remove(serverName);
+      plugin.getStartingServersSince().remove(serverName);
+      startInitiators.remove(serverName);
       return;
     }
 

@@ -68,6 +68,9 @@ public class VelocityPteroPower {
     private final Set<String> startingServers = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Long> playerCooldowns = new ConcurrentHashMap<>();
     private final Map<String, Long> shutdownDeadlines = new ConcurrentHashMap<>();
+    private final Map<String, UUID> startInitiators = new ConcurrentHashMap<>();
+    // Track when a server was marked as starting, for periodic cleanup
+    private final Map<String, Long> startingServersSince = new ConcurrentHashMap<>();
 
     @Inject
     public VelocityPteroPower(
@@ -122,6 +125,9 @@ public class VelocityPteroPower {
         this.serverLifecycleManager.scheduleAlwaysOnlineMaintenance();
         // Schedule periodic idle shutdown sweep (failsafe)
         this.serverLifecycleManager.scheduleIdleShutdownSweep();
+
+        // Schedule periodic cleanup of potentially stuck 'startingServers' entries
+        this.scheduleStartingServersSweep();
 
         // Periodic resource usage prefetch (warm cache) if enabled
         if (configurationManager.isResourcePrefetchEnabled()) {
@@ -319,5 +325,63 @@ public class VelocityPteroPower {
 
     public LobbyBalancerManager getLobbyBalancerManager() {
         return lobbyBalancerManager;
+    }
+
+    public Map<String, UUID> getStartInitiators() {
+        return startInitiators;
+    }
+
+    public Map<String, Long> getStartingServersSince() {
+        return startingServersSince;
+    }
+
+    private void scheduleStartingServersSweep() {
+        final int sweepIntervalSeconds = 60; // run every 60 seconds
+        Runnable sweep = new Runnable() {
+            @Override public void run() {
+                try {
+                    long now = System.currentTimeMillis();
+                    var namesSnapshot = Set.copyOf(startingServers);
+                    for (String name : namesSnapshot) {
+                        PteroServerInfo info = serverInfoMap.get(name);
+                        if (info == null) {
+                            // Not managed anymore; clean up
+                            startingServers.remove(name);
+                            startInitiators.remove(name);
+                            startingServersSince.remove(name);
+                            continue;
+                        }
+                        boolean online = rateLimitTracker.canMakeRequest() && apiClient.isServerOnline(name, info.getServerId());
+                        if (online) {
+                            filteredLogger.debug("Cleanup sweep: '{}' is online. Clearing 'starting' state.", name);
+                            startingServers.remove(name);
+                            startInitiators.remove(name);
+                            startingServersSince.remove(name);
+                            continue;
+                        }
+                        long since = startingServersSince.getOrDefault(name, now);
+                        long maxWaitSeconds = configurationManager.getStartupInitialCheckDelay()
+                                + (12L * Math.max(5, info.getJoinDelay()))
+                                + 10L; // small buffer
+                        if (now - since > maxWaitSeconds * 1000L) {
+                            filteredLogger.warn("Cleanup sweep: '{}' exceeded max startup window ({}s). Clearing stuck state.", name, maxWaitSeconds);
+                            startingServers.remove(name);
+                            startInitiators.remove(name);
+                            startingServersSince.remove(name);
+                        }
+                    }
+                } catch (Exception ex) {
+                    filteredLogger.debug("Starting-servers sweep error: {}", ex.toString());
+                } finally {
+                    proxyServer.getScheduler().buildTask(VelocityPteroPower.this, this)
+                            .delay(sweepIntervalSeconds, java.util.concurrent.TimeUnit.SECONDS)
+                            .schedule();
+                }
+            }
+        };
+        proxyServer.getScheduler().buildTask(this, sweep)
+                .delay(sweepIntervalSeconds, java.util.concurrent.TimeUnit.SECONDS)
+                .schedule();
+        filteredLogger.info("Scheduled starting-servers cleanup sweep every {} seconds.", sweepIntervalSeconds);
     }
 }
