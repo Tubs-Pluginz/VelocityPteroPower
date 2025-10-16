@@ -57,7 +57,7 @@ jobs:
       - name: Publish to Modrinth
         uses: WiIIiam278/mc-publish@hangar
         with:
-          modrinth-id: bEIUEGTX
+          modrinth-id: 1dDr5J4w
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files-primary: ${{ steps.meta.outputs.artifact }}
           name: VelocityPteroPower v${{ steps.meta.outputs.version }}

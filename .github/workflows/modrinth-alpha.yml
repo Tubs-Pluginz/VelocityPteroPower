@@ -51,7 +51,7 @@ jobs:
       - name: Publish to Modrinth (alpha)
         uses: WiIIiam278/mc-publish@hangar
         with:
-          modrinth-id: bEIUEGTX
+          modrinth-id: 1dDr5J4w
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           modrinth-featured: false
 
