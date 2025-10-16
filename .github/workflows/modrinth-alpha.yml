@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for branch history/tags in changelog
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
@@ -60,33 +62,55 @@ jobs:
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "artifact=${DST}" >> "$GITHUB_OUTPUT"
 
-      - name: Build alpha changelog text
+      - name: Build branch-wide changelog (Markdown)
         id: changelog
         run: |
           set -euo pipefail
-          {
-            echo "## ⚠️ Alpha build"
-            echo
-            echo "> This build is generated automatically on every commit and may be unstable or untested."
-            echo "> Need help? Join the Discord: https://discord.pluginz.dev"
-            echo
-            echo "### What's in testing (commits in this push)"
-            # List commits included in this push event
-            jq -r '.commits[] | "- " + .id[0:7] + " " + (.message | gsub("\r?\n"; " ")) + " (" + (.author.username // .author.name // "unknown") + ")"' \
-              "$GITHUB_EVENT_PATH" || true
-            echo
-            echo "### Links"
-            echo "- Branch history: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
-            echo "- This commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
-            echo "- Compare (last 20): https://github.com/${GITHUB_REPOSITORY}/compare/${GITHUB_REF_NAME}~20...${GITHUB_REF_NAME}"
-          } > changelog.md
+          REPO="https://github.com/${GITHUB_REPOSITORY}"
+          BRANCH="${GITHUB_REF_NAME}"
 
-          # Escape for multiline output
-          CONTENT="$(cat changelog.md)"
-          CONTENT="${CONTENT//'%'/'%25'}"
-          CONTENT="${CONTENT//$'\n'/'%0A'}"
-          CONTENT="${CONTENT//$'\r'/'%0D'}"
-          echo "text=$CONTENT" >> "$GITHUB_OUTPUT"
+          # Ensure tags available for compare link
+          git fetch --tags --force --prune >/dev/null 2>&1 || true
+
+          LAST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
+          if [ -n "$LAST_TAG" ]; then
+            COMPARE_URL="${REPO}/compare/${LAST_TAG}...${GITHUB_SHA}"
+          else
+            FIRST_COMMIT="$(git rev-list --max-parents=0 HEAD | tail -n1)"
+            COMPARE_URL="${REPO}/compare/${FIRST_COMMIT}...${GITHUB_SHA}"
+          fi
+
+          # Recent commits (last 20) on this branch
+          RECENT_LOG="$(git log --first-parent -n 20 --pretty='- %h %s (%an)')"
+
+          cat > changelog.md <<'MD'
+## ⚠️ Alpha build
+
+> This build is generated automatically on every commit and may be unstable or untested.  
+> Need help? Join the Discord: https://discord.pluginz.dev
+
+### Links
+- Branch history: REPO/commits/BRANCH
+- Full changes since last tag (or start): COMPARE_URL
+- This commit: REPO/commit/GITHUB_SHA
+
+### Recent changes on BRANCH (last 20)
+RECENT_LOG
+MD
+
+          # Replace placeholders
+          sed -i "s|REPO|${REPO}|g" changelog.md
+          sed -i "s|BRANCH|${BRANCH}|g" changelog.md
+          sed -i "s|COMPARE_URL|${COMPARE_URL}|g" changelog.md
+          sed -i "s|GITHUB_SHA|${GITHUB_SHA}|g" changelog.md
+          awk -v repl="${RECENT_LOG//$'\n'/'\n'}" '{gsub("RECENT_LOG", repl)}1' changelog.md > changelog.out && mv changelog.out changelog.md
+
+          # Output raw markdown (no URL encoding)
+          {
+            echo "text<<EOF"
+            cat changelog.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Publish to Modrinth (alpha)
         uses: WiIIiam278/mc-publish@hangar
