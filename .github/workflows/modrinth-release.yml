@@ -1,0 +1,113 @@
+name: Modrinth Publish
+
+on:
+  push:
+    branches: ['**'] # every branch → alpha build
+    paths-ignore:
+      - 'workflows/**'
+      - 'README.md'
+  release:
+    types: [published] # when you publish a GitHub release
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Distinguish between alpha (commit) and beta (release)
+      - name: Determine build type
+        id: type
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "type=beta" >> "$GITHUB_OUTPUT"
+            echo "profile=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=alpha" >> "$GITHUB_OUTPUT"
+            echo "profile=default" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Build with Maven, optionally activating the beta profile
+      - name: Build with Maven (shade)
+        run: |
+          mvn -B -V -e -DskipTests package -P${{ steps.type.outputs.profile }}
+
+      # Get version from pom.xml and shorten commit SHA
+      - name: Determine version
+        id: meta
+        run: |
+          POM_VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' \
+            --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          VERSION="${POM_VERSION}-${SHORT_SHA}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "artifact=target/$(ls target | grep -E '\.jar$' | head -n1)" >> "$GITHUB_OUTPUT"
+
+      # Always-upload step
+      - name: Publish to Modrinth
+        uses: WiIIiam278/mc-publish@hangar
+        with:
+          modrinth-id: bEIUEGTX
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files-primary: ${{ steps.meta.outputs.artifact }}
+          name: VelocityPteroPower v${{ steps.meta.outputs.version }}
+          version: ${{ steps.meta.outputs.version }}
+          version-type: ${{ steps.type.outputs.type }}
+          changelog: ${{ github.event.head_commit.message || github.event.release.body }}
+          loaders: |
+            velocity
+          game-versions: |
+            1.13
+            1.13.1
+            1.13.2
+            1.14
+            1.14.1
+            1.14.2
+            1.14.3
+            1.14.4
+            1.15
+            1.15.1
+            1.15.2
+            1.16
+            1.16.1
+            1.16.2
+            1.16.3
+            1.16.4
+            1.16.5
+            1.17
+            1.17.1
+            1.18
+            1.18.1
+            1.18.2
+            1.19
+            1.19.1
+            1.19.2
+            1.19.3
+            1.19.4
+            1.20
+            1.20.1
+            1.20.2
+            1.20.3
+            1.20.4
+            1.20.5
+            1.20.6
+            1.21
+            1.21.1
+            1.21.2
+            1.21.3
+            1.21.4
+            1.21.5
+            1.21.6
+            1.21.7
+            1.21.8
+          java: 21
