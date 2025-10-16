@@ -67,7 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "## ⚠️ Alpha build"
+            echo "## ⚠️ Alpha build for branch: ${GITHUB_REF_NAME}"
             echo
             echo "> This build is generated automatically on every commit and may be unstable or untested."
             echo "> Need help? Join the Discord: https://discord.pluginz.dev"
