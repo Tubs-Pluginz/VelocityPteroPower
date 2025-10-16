@@ -80,13 +80,14 @@ jobs:
             echo "- Branch history: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
             echo "- This commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
             echo "- Compare (last 20): https://github.com/${GITHUB_REPOSITORY}/compare/${GITHUB_REF_NAME}~20...${GITHUB_REF_NAME}"
-          } >> "$GITHUB_OUTPUT"
+          } > changelog.md
 
-          # Use EOF delimiter for clean multiline output
-          EOF=$(dd if=/dev/urandom bs=15 count=1 2>/dev/null | base64)
-          echo "text<<$EOF" >> "$GITHUB_OUTPUT"
-          cat changelog.md >> "$GITHUB_OUTPUT"
-          echo "$EOF" >> "$GITHUB_OUTPUT"
+          # Use EOF delimiter for clean multiline GitHub output
+          {
+            echo 'text<<EOF'
+            cat changelog.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Publish to Modrinth (alpha)
         uses: WiIIiam278/mc-publish@hangar
