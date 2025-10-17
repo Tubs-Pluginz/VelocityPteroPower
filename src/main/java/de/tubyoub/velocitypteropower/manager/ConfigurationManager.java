@@ -153,7 +153,7 @@ public class ConfigurationManager {
             shutdownRetryDelay = (int) config.get("shutdownRetryDelay", 30);
             shutdownRetries = (int) config.get("shutdownRetries", 3);
             idleStartShutdownTime = (int) config.get("idleStartShutdownTime", 300);
-            playerCommandCooldown = (int) config.get("playerCommandCooldown", 10);
+            playerCommandCooldown = (int) config.get("playerStartCooldown", 10);
             startupInitialCheckDelay = (int) config.get("startupInitialCheckDelay", 10);
             whitelistCheckInterval = (int) config.get("whitelistCheckInterval", 10);
             maxOnlineServers = (int) config.get("maxOnlineServers", 0);
