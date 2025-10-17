@@ -15,7 +15,7 @@ command:
   no-permission: "<red>You do not have permission to perform this command.</red>"
   player-only: "<red>Only players can use this command.</red>"
   console-only: "<red>Only the console can use this command.</red>"
-  usage: "<gray>Usage:</gray> <yellow>/{usage}</yellow>"
+  usage: "<gray>Usage:</gray> <yellow>/<usage></yellow>"
   unknown-subcommand: "<red>Unknown subcommand:</red> <yellow><sub></yellow>"
   mcss-not-supported: "<red>Mc Server Soft does not support this command.</red>"
   no-servers-found: "<red>No servers found in configuration to stop.</red>"
