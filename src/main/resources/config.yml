@@ -234,7 +234,7 @@ pterodactyl:
   url: "https://panel.example.com"
   # The client api key of your panel.
   # The Plugin supports the Pterodactyl & Pelican System.
-  # Your API Key should either start with "ptlc_" or "peli_"
+  # Your API Key should start with "ptlc_" or "pacc" if you are using the Ptero or Peli Panel
   # You can find the client api key in the "API Credentials" tab of the "Account" page.
   apiKey: "ptlc_000000000000000000000000000000000000000000"
 
