@@ -138,6 +138,14 @@ public class PteroCommand implements SimpleCommand {
                 }
                 break;
 
+            case "history":
+                if (sender.hasPermission("ptero.history")) {
+                    showHistory(sender, args);
+                } else {
+                    sender.sendMessage(messages.prefixed(MessageKey.COMMAND_NO_PERMISSION));
+                }
+                break;
+
             default:
                 sender.sendMessage(
                         messages.prefixed(
@@ -393,6 +401,47 @@ public class PteroCommand implements SimpleCommand {
         sender.sendMessage(messages.prefixed(MessageKey.GENERIC_RELOAD_SUCCESS));
     }
 
+    private void showHistory(CommandSource sender, String[] args) {
+        var mhs = plugin.getMoveHistoryService();
+        if (mhs == null || !plugin.getConfigurationManager().isMoveHistoryEnabled()) {
+            sender.sendMessage(Component.text("Move history is disabled in config."));
+            return;
+        }
+        UUID targetId = null;
+        String displayName = null;
+        if (args.length >= 2) {
+            String nameOrUuid = args[1];
+            // Try online player by name (case-insensitive)
+            Optional<com.velocitypowered.api.proxy.Player> online = plugin.getProxyServer().getAllPlayers().stream()
+                    .filter(p -> p.getUsername().equalsIgnoreCase(nameOrUuid)).findFirst();
+            if (online.isPresent()) {
+                targetId = online.get().getUniqueId();
+                displayName = online.get().getUsername();
+            } else {
+                // Try parse UUID
+                try {
+                    targetId = UUID.fromString(nameOrUuid);
+                    displayName = mhs.findLastKnownName(targetId).orElse(nameOrUuid);
+                } catch (IllegalArgumentException ex) {
+                    sender.sendMessage(Component.text("Player not found online and not a valid UUID: " + nameOrUuid));
+                    return;
+                }
+            }
+        } else if (sender instanceof com.velocitypowered.api.proxy.Player p) {
+            targetId = p.getUniqueId();
+            displayName = p.getUsername();
+        } else {
+            sender.sendMessage(Component.text("Usage: /ptero history <playerName|uuid>"));
+            return;
+        }
+
+        List<de.tubyoub.velocitypteropower.service.MoveHistoryService.MoveRecord> recs = mhs.getHistory(targetId);
+        Component out = de.tubyoub.velocitypteropower.service.MoveHistoryService.renderPretty(recs, Locale.ROOT);
+        // Prepend small header mentioning the player
+        sender.sendMessage(Component.text("History for "+displayName+":"));
+        sender.sendMessage(out);
+    }
+
 
     // Shows a pretty list of managed servers with status, player count, and time-to-shutdown
     private void listServers(CommandSource sender) {
@@ -569,6 +618,20 @@ public class PteroCommand implements SimpleCommand {
                     ph.put("tx", "n/a");
                     ph.put("uptime", "n/a");
                     sender.sendMessage(messages.prefixed(MessageKey.COMMAND_INFO_BODY, ph));
+                    // Append initiator info, if any
+                    try {
+                        java.util.UUID init = plugin.getStartInitiators().get(serverName);
+                        if (init != null) {
+                            String who = plugin.getProxyServer().getPlayer(init).map(p -> p.getUsername())
+                                    .orElseGet(() -> {
+                                        var mhs = plugin.getMoveHistoryService();
+                                        if (mhs != null) return mhs.findLastKnownName(init).orElse(init.toString());
+                                        return init.toString();
+                                    });
+                            net.kyori.adventure.text.minimessage.MiniMessage mm = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage();
+                            sender.sendMessage(mm.deserialize("<gray>Started by:</gray> <yellow>" + who + "</yellow>"));
+                        }
+                    } catch (Exception ignored) {}
                 }).schedule();
                 return;
             }
@@ -647,7 +710,23 @@ public class PteroCommand implements SimpleCommand {
             logger.debug("Info usage for {} -> CPU={} MEM={} DISK={} RX={} TX={} UPTIME={}",
                     serverName, cpuFormatted, memFormatted, diskFormatted, rx, tx, uptime);
 
-            plugin.getProxyServer().getScheduler().buildTask(plugin, () -> sender.sendMessage(messages.prefixed(MessageKey.COMMAND_INFO_BODY, ph))).schedule();
+            plugin.getProxyServer().getScheduler().buildTask(plugin, () -> {
+                sender.sendMessage(messages.prefixed(MessageKey.COMMAND_INFO_BODY, ph));
+                // Append initiator info, if any
+                try {
+                    java.util.UUID init = plugin.getStartInitiators().get(serverName);
+                    if (init != null) {
+                        String who = plugin.getProxyServer().getPlayer(init).map(p -> p.getUsername())
+                                .orElseGet(() -> {
+                                    var mhs = plugin.getMoveHistoryService();
+                                    if (mhs != null) return mhs.findLastKnownName(init).orElse(init.toString());
+                                    return init.toString();
+                                });
+                        net.kyori.adventure.text.minimessage.MiniMessage mm = net.kyori.adventure.text.minimessage.MiniMessage.miniMessage();
+                        sender.sendMessage(mm.deserialize("<gray>Started by:</gray> <yellow>" + who + "</yellow>"));
+                    }
+                } catch (Exception ignored) {}
+            }).schedule();
         });
     }
 
@@ -711,6 +790,7 @@ public class PteroCommand implements SimpleCommand {
             if (sender.hasPermission("ptero.restart")) subs.add("restart");
             if (sender.hasPermission("ptero.list")) subs.add("list");
             if (sender.hasPermission("ptero.info")) subs.add("info");
+            if (sender.hasPermission("ptero.history")) subs.add("history");
             if (sender.hasPermission("ptero.stopIdle")) subs.add("stopidle");
             if (sender.hasPermission("ptero.whitelistReload")) subs.add("whitelistReload");
             if (sender.hasPermission("ptero.reload")) subs.add("reload");
@@ -741,6 +821,14 @@ public class PteroCommand implements SimpleCommand {
                             .sorted(String.CASE_INSENSITIVE_ORDER)
                             .collect(Collectors.toList());
                 }
+            } else if (sub.equals("history")) {
+                if (!sender.hasPermission("ptero.history")) return java.util.Collections.emptyList();
+                String prefix = args[1].toLowerCase(Locale.ROOT);
+                return plugin.getProxyServer().getAllPlayers().stream()
+                        .map(p -> p.getUsername())
+                        .filter(n -> n.toLowerCase(Locale.ROOT).startsWith(prefix))
+                        .sorted(String.CASE_INSENSITIVE_ORDER)
+                        .collect(Collectors.toList());
             } else if (sub.equals("forcestopall") || sub.equals("forcestartall")) {
                 // Suggest the confirmation token
                 if (!sender.hasPermission("ptero." + sub)) return java.util.Collections.emptyList();
@@ -759,6 +847,7 @@ public class PteroCommand implements SimpleCommand {
         sender.sendMessage(Component.text("/ptero restart <serverName>"));
         sender.sendMessage(Component.text("/ptero list"));
         sender.sendMessage(Component.text("/ptero info <serverName>"));
+        sender.sendMessage(Component.text("/ptero history [playerName|uuid]"));
         sender.sendMessage(Component.text("/ptero stopidle"));
         sender.sendMessage(Component.text("/ptero forcestopall"));
         sender.sendMessage(Component.text("/ptero forcestartall"));

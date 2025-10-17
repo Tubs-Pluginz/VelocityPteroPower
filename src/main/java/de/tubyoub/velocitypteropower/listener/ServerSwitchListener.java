@@ -34,6 +34,15 @@ public class ServerSwitchListener {
     // Cleanup limbo record on disconnect
     try { var lts = plugin.getLimboTrackerService(); if (lts != null) lts.clearForPlayer(player.getUniqueId(), "disconnect"); } catch (Exception ignored) {}
 
+    // Record move history: current -> DISCONNECT
+    try {
+      var mhs = plugin.getMoveHistoryService();
+      if (mhs != null) {
+        String from = player.getCurrentServer().map(sc -> sc.getServer().getServerInfo().getName()).orElse("-");
+        mhs.record(player.getUniqueId(), player.getUsername(), from, "DISCONNECT");
+      }
+    } catch (Exception ignored) {}
+
     player.getCurrentServer()
         .ifPresent(
             serverConnection -> {
@@ -54,6 +63,15 @@ public class ServerSwitchListener {
   public void onServerSwitch(ServerConnectedEvent event) {
     RegisteredServer newServer = event.getServer();
     String newServerName = newServer.getServerInfo().getName();
+
+    // Record move history: previous -> new
+    try {
+      var mhs = plugin.getMoveHistoryService();
+      if (mhs != null) {
+        String from = event.getPreviousServer().map(ps -> ps.getServerInfo().getName()).orElse("-");
+        mhs.record(event.getPlayer(), from, newServerName);
+      }
+    } catch (Exception ignored) {}
 
     // Record if player joined a limbo by themselves (no prior record)
     try {

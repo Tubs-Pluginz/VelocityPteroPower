@@ -63,6 +63,7 @@ public class VelocityPteroPower {
     private ServerSwitchListener serverSwitchListener;
     private LobbyBalancerManager lobbyBalancerManager;
     private de.tubyoub.velocitypteropower.service.LimboTrackerService limboTrackerService;
+    private de.tubyoub.velocitypteropower.service.MoveHistoryService moveHistoryService;
 
     private FilteredComponentLogger filteredLogger;
 
@@ -133,6 +134,15 @@ public class VelocityPteroPower {
         this.proxyServer.getScheduler().buildTask(this, () -> {
             try { if (limboTrackerService != null) limboTrackerService.sweepNow(); } catch (Exception ignored) {}
         }).delay(Math.max(10, configurationManager.getIdleShutdownCheckInterval()), java.util.concurrent.TimeUnit.SECONDS).schedule();
+        
+        // Initialize move history (optional, in-memory only)
+        if (configurationManager.isMoveHistoryEnabled()) {
+            this.moveHistoryService = new de.tubyoub.velocitypteropower.service.MoveHistoryService(this, configurationManager.getMoveHistoryMaxEntries());
+            filteredLogger.info("Move history tracking is ENABLED (max {} entries/player, memory-only).", configurationManager.getMoveHistoryMaxEntries());
+        } else {
+            this.moveHistoryService = null;
+        }
+        
         // Schedule periodic enforcement of always-online servers
         this.serverLifecycleManager.scheduleAlwaysOnlineMaintenance();
         // Trigger an immediate always-online enforcement once at startup
@@ -444,6 +454,10 @@ public class VelocityPteroPower {
 
     public de.tubyoub.velocitypteropower.service.LimboTrackerService getLimboTrackerService() {
         return limboTrackerService;
+    }
+
+    public de.tubyoub.velocitypteropower.service.MoveHistoryService getMoveHistoryService() {
+        return moveHistoryService;
     }
 
     public Map<String, UUID> getStartInitiators() {

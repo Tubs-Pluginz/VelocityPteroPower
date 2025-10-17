@@ -4,7 +4,7 @@
 ################################
 
 # Version of the configuration file
-fileversion: 13
+fileversion: 14
 
 # Check for updates
 # If true, the plugin will check for updates on startup.
@@ -146,6 +146,14 @@ resourcePrefetchEnabled: true
 # Set to 0 or negative to disable.
 # default = 60
 idleShutdownCheckInterval: 60
+
+# In-memory player move history (server switch history)
+# Pretty display command: /ptero history [player]
+# Data is NOT saved to disk; only kept while the proxy is running
+moveHistory:
+  enabled: false
+  # Maximum number of recent moves to retain per player (latest first)
+  maxEntriesPerPlayer: 50
 
 # Lifecycle related behavior
 lifecycle:

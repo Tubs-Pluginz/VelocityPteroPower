@@ -73,6 +73,10 @@ public class ConfigurationManager {
     private boolean resourcePrefetchEnabled;
     private int idleShutdownCheckInterval;
 
+    // Move history
+    private boolean moveHistoryEnabled;
+    private int moveHistoryMaxEntries;
+
     // Lifecycle
     private List<String> shutdownOnProxyExitList;
 
@@ -133,6 +137,7 @@ public class ConfigurationManager {
                                         .addIgnoredRoute("11", "servers", '.')
                                         .addIgnoredRoute("12", "servers", '.')
                                         .addIgnoredRoute("13", "servers", '.')
+                                        .addIgnoredRoute("14", "servers", '.')
                                         .build());
 
 
@@ -161,6 +166,16 @@ public class ConfigurationManager {
             resourceCacheSeconds = (int) config.get("resourceCacheSeconds", 10);
             resourcePrefetchEnabled = (boolean) config.get("resourcePrefetchEnabled", true);
             idleShutdownCheckInterval = (int) config.get("idleShutdownCheckInterval", 60);
+
+            // Move history section
+            Section mh = config.getSection("moveHistory");
+            if (mh != null) {
+                moveHistoryEnabled = mh.getBoolean("enabled", false);
+                moveHistoryMaxEntries = mh.getInt("maxEntriesPerPlayer", 50);
+            } else {
+                moveHistoryEnabled = false;
+                moveHistoryMaxEntries = 50;
+            }
 
             // Lifecycle section
             Section lifecycle = config.getSection("lifecycle");
@@ -512,6 +527,9 @@ public class ConfigurationManager {
     public int getIdleShutdownCheckInterval() {
         return Math.max(0, idleShutdownCheckInterval);
     }
+
+    public boolean isMoveHistoryEnabled() { return moveHistoryEnabled; }
+    public int getMoveHistoryMaxEntries() { return Math.max(1, moveHistoryMaxEntries); }
 
     public java.util.List<String> getShutdownOnProxyExitList() {
         return shutdownOnProxyExitList == null ? java.util.Collections.emptyList() : shutdownOnProxyExitList;
