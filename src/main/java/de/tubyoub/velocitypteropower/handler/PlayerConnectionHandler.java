@@ -121,6 +121,10 @@ public class PlayerConnectionHandler {
     long lastStartTime = playerCooldowns.getOrDefault(player.getUniqueId(), 0L);
     int cooldownMillis = configurationManager.getPlayerCommandCooldown() * 1000;
 
+    if (configurationManager.getPlayerCommandCooldown() <= 0){
+        return false;
+    }
+
     if (currentTime - lastStartTime < cooldownMillis) {
       long remainingSeconds =
           TimeUnit.MILLISECONDS.toSeconds(cooldownMillis - (currentTime - lastStartTime)) + 1;
