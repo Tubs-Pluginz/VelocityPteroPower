@@ -152,8 +152,12 @@ lifecycle:
   # When the proxy shuts down, stop these servers.
   # Use "all" to stop all managed servers, or provide a list of specific server names.
   # This overrides 'alwaysOnline' during shutdown.
-  shutdownOnProxyExit:
-    - all
+  # Leave the list empty to disable stopping servers on proxy shutdown (default behavior).
+  # To stop all managed servers on shutdown, set:
+  #   shutdownOnProxyExit:
+  #     - all
+  # Or list specific servers by name.
+  shutdownOnProxyExit: []
 
 # Multi-lobby/limbo balancer settings
 lobbyBalancer:

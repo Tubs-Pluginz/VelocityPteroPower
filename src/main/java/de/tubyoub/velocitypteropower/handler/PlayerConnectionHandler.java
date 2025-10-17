@@ -214,6 +214,7 @@ public class PlayerConnectionHandler {
       plugin.getStartingServersSince().put(serverName, System.currentTimeMillis());
       playerCooldowns.put(player.getUniqueId(), System.currentTimeMillis());
       apiClient.powerServer(serverId, PowerSignal.START);
+      plugin.recordServerStartSignalSent();
       scheduleInitialIdleCheck(serverName, serverId);
     }
 

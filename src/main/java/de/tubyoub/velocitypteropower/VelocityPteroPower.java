@@ -73,6 +73,10 @@ public class VelocityPteroPower {
     // Track when a server was marked as starting, for periodic cleanup
     private final Map<String, Long> startingServersSince = new ConcurrentHashMap<>();
 
+    // bStats metrics instance and counters
+    private Metrics metrics;
+    private final java.util.concurrent.atomic.AtomicInteger serversStartedSinceBoot = new java.util.concurrent.atomic.AtomicInteger(0);
+
     @Inject
     public VelocityPteroPower(
             ProxyServer proxy,
@@ -136,6 +140,7 @@ public class VelocityPteroPower {
                             if (!apiClient.isServerOnline(name, info.getServerId())) {
                                 filteredLogger.info(messagesManager.mm(MessageKey.POWER_ACTION_SENT, java.util.Map.of("action", "start", "server", name)));
                                 apiClient.powerServer(info.getServerId(), PowerSignal.START);
+                                recordServerStartSignalSent();
                             }
                         } catch (Exception ignored) {}
                     }
@@ -182,7 +187,44 @@ public class VelocityPteroPower {
         proxyServer.getEventManager().register(this, playerConnectionHandler);
         proxyServer.getEventManager().register(this, serverSwitchListener);
 
-        metricsFactory.make(this, BSTATS_PLUGIN_ID);
+        // Initialize bStats metrics and register custom charts
+        this.metrics = metricsFactory.make(this, BSTATS_PLUGIN_ID);
+        if (this.metrics != null) {
+            try {
+                // Total managed servers
+                this.metrics.addCustomChart(new Metrics.SingleLineChart("vpp_managed_servers", () -> {
+                    try {
+                        return serverInfoMap != null ? serverInfoMap.size() : 0;
+                    } catch (Exception ignored) {
+                        return 0;
+                    }
+                }));
+                // Total starts since boot
+                this.metrics.addCustomChart(new Metrics.SingleLineChart("vpp_total_servers_started", () -> serversStartedSinceBoot.get()));
+                // Current online servers (best-effort)
+                this.metrics.addCustomChart(new Metrics.SingleLineChart("vpp_current_online_servers", () -> {
+                    try {
+                        if (serverLifecycleManager == null) return 0;
+                        int v = serverLifecycleManager.countOnlineServersExcluding(java.util.Collections.emptySet());
+                        return Math.max(0, v);
+                    } catch (Exception ignored) {
+                        return 0;
+                    }
+                }));
+                // Panel type breakdown
+                this.metrics.addCustomChart(new Metrics.SimplePie("vpp_panel_type", () -> {
+                    try {
+                        return configurationManager != null && configurationManager.getPanelType() != null
+                                ? configurationManager.getPanelType().name()
+                                : "UNKNOWN";
+                    } catch (Exception ignored) {
+                        return "UNKNOWN";
+                    }
+                }));
+            } catch (Exception ex) {
+                filteredLogger.debug("Failed to register bStats custom charts: {}", ex.toString());
+            }
+        }
         updateService.performUpdateCheck();
 
         filteredLogger.info("VelocityPteroPower v{} successfully loaded.", VERSION);
@@ -191,25 +233,38 @@ public class VelocityPteroPower {
     @Subscribe
     public void onProxyShutdown(ProxyShutdownEvent event) {
         try {
-            var list = configurationManager.getShutdownOnProxyExitList();
-            if (list != null && !list.isEmpty() && serverInfoMap != null) {
-                boolean all = list.stream().anyMatch(s -> s.equalsIgnoreCase("all"));
-                int count = 0;
-                for (Map.Entry<String, PteroServerInfo> e : serverInfoMap.entrySet()) {
-                    String name = e.getKey();
-                    if (!all && list.stream().noneMatch(s -> s.equalsIgnoreCase(name))) {
-                        continue;
-                    }
-                    try {
-                        apiClient.powerServer(e.getValue().getServerId(), PowerSignal.STOP);
-                        count++;
-                    } catch (Exception ex) {
-                        filteredLogger.warn("Failed sending stop on shutdown for {}: {}", name, ex.toString());
-                    }
+            var rawList = configurationManager.getShutdownOnProxyExitList();
+            if (serverInfoMap == null || rawList == null) return;
+
+            // Clean up the list: remove null/blank entries and normalize to lowercase
+            java.util.Set<String> targets = new java.util.HashSet<>();
+            for (String s : rawList) {
+                if (s == null) continue;
+                String t = s.trim();
+                if (t.isEmpty()) continue;
+                targets.add(t.toLowerCase());
+            }
+
+            // If the list is empty after cleanup, treat as deactivated
+            if (targets.isEmpty()) return;
+
+            boolean all = targets.contains("all");
+            int count = 0;
+            for (Map.Entry<String, PteroServerInfo> e : serverInfoMap.entrySet()) {
+                String name = e.getKey();
+                String nameLc = name.toLowerCase();
+                if (!all && !targets.contains(nameLc)) {
+                    continue;
                 }
-                if (count > 0) {
-                    filteredLogger.info(messagesManager.mm(MessageKey.COMMAND_STOPPING_ALL_SERVERS, java.util.Map.of("count", String.valueOf(count))));
+                try {
+                    apiClient.powerServer(e.getValue().getServerId(), PowerSignal.STOP);
+                    count++;
+                } catch (Exception ex) {
+                    filteredLogger.warn("Failed sending stop on shutdown for {}: {}", name, ex.toString());
                 }
+            }
+            if (count > 0) {
+                filteredLogger.info(messagesManager.mm(MessageKey.COMMAND_STOPPING_ALL_SERVERS, java.util.Map.of("count", String.valueOf(count))));
             }
         } catch (Exception ex) {
             filteredLogger.warn("Error during shutdown stop sequence: {}", ex.toString());
@@ -286,6 +341,13 @@ public class VelocityPteroPower {
         if (!apiClient.isApiKeyValid(configurationManager.getPterodactylApiKey())) {
             logInvalidApiKeyError();
             this.apiClient = null;
+        }
+    }
+
+    public void recordServerStartSignalSent() {
+        try {
+            serversStartedSinceBoot.incrementAndGet();
+        } catch (Exception ignored) {
         }
     }
 

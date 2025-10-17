@@ -275,6 +275,7 @@ public class PteroCommand implements SimpleCommand {
             PteroServerInfo serverInfo = entry.getValue();
             if (rateLimitTracker.canMakeRequest()) {
                 apiClient.powerServer(serverInfo.getServerId(), PowerSignal.START);
+                plugin.recordServerStartSignalSent();
                 started++;
             } else {
                 sender.sendMessage(messages.prefixed(MessageKey.COMMAND_RATE_LIMIT_EXCEEDED));
@@ -327,6 +328,7 @@ public class PteroCommand implements SimpleCommand {
                     }
                 }
                 apiClient.powerServer(info.getServerId(), PowerSignal.START);
+                plugin.recordServerStartSignalSent();
             }
             sender.sendMessage(
                     messages.prefixed(

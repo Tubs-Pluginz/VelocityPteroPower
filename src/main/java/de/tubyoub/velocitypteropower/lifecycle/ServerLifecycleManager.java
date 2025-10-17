@@ -378,6 +378,7 @@ public class ServerLifecycleManager {
               if (!online) {
                 logger.info(messages.mm(MessageKey.POWER_ACTION_SENT, Map.of("action", "start", "server", name)));
                 apiClient.powerServer(id, PowerSignal.START);
+                plugin.recordServerStartSignalSent();
               }
             }
           }
