@@ -5,6 +5,7 @@ import com.velocitypowered.api.event.player.ServerPreConnectEvent;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
+import com.velocitypowered.api.proxy.ConnectionRequestBuilder;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
 import de.tubyoub.velocitypteropower.api.PanelAPIClient;
@@ -16,6 +17,8 @@ import de.tubyoub.velocitypteropower.model.PteroServerInfo;
 import de.tubyoub.velocitypteropower.util.RateLimitTracker;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Optional;
@@ -25,7 +28,8 @@ import java.util.concurrent.TimeUnit;
 
 public class PlayerConnectionHandler {
 
-  private final ProxyServer proxyServer;
+    private static final Logger log = LoggerFactory.getLogger(PlayerConnectionHandler.class);
+    private final ProxyServer proxyServer;
   private final VelocityPteroPower plugin;
   private final ComponentLogger logger;
   private final ConfigurationManager configurationManager;
@@ -84,7 +88,7 @@ public class PlayerConnectionHandler {
       return;
     }
 
-    boolean isOnline = rateLimitTracker.canMakeRequest() && apiClient.isServerOnline(serverName, serverId);
+    boolean isOnline = apiClient.isServerOnline(serverName, serverId);
 
     if (isOnline) {
       // If the player is already connected to the target server, do not attempt a transfer
@@ -402,8 +406,7 @@ public class PlayerConnectionHandler {
                   return;
                 }
 
-                if (rateLimitTracker.canMakeRequest()
-                    && apiClient.isServerOnline(targetServerName, targetServerInfo.getServerId())) {
+                if (apiClient.isServerOnline(targetServerName, targetServerInfo.getServerId())) {
                   logger.info(
                       "Server {} is now online. Attempting to connect player {}.",
                       targetServerName,
@@ -472,8 +475,41 @@ public class PlayerConnectionHandler {
       return;
     }
 
+    // Clear starting markers BEFORE attempting connection to avoid being re-routed to limbo by pre-connect
+    startingServers.remove(serverName);
+    plugin.getStartingServersSince().remove(serverName);
+    startInitiators.remove(serverName);
+
     logger.info("Connecting player {} to server {}.", player.getUsername(), serverName);
-    player.createConnectionRequest(targetServer).fireAndForget();
+    player.createConnectionRequest(targetServer).connect().whenComplete((result, throwable) -> {
+      if (throwable != null) {
+        logger.debug("Connect failed for {} to {}: {}", player.getUsername(), serverName, throwable.toString());
+        // Retry once after a short delay
+        proxyServer.getScheduler().buildTask(plugin, () -> connectPlayerToServer(player, serverName))
+            .delay(2, java.util.concurrent.TimeUnit.SECONDS)
+            .schedule();
+        return;
+      }
+      if (result == null) {
+        logger.debug("Connect returned null result for {} to {} — retrying shortly.", player.getUsername(), serverName);
+        proxyServer.getScheduler().buildTask(plugin, () -> connectPlayerToServer(player, serverName))
+            .delay(2, java.util.concurrent.TimeUnit.SECONDS)
+            .schedule();
+        return;
+      }
+      ConnectionRequestBuilder.Status status = result.getStatus();
+      switch (status) {
+        case SUCCESS -> logger.info("{} moved to {}", player.getUsername(), serverName);
+        case ALREADY_CONNECTED -> logger.debug("{} was already on {}", player.getUsername(), serverName);
+        default -> {
+          // If denied or cancelled by event logic, retry once shortly
+          logger.debug("Connect status for {} to {} was {} — retrying shortly.", player.getUsername(), serverName, status);
+          proxyServer.getScheduler().buildTask(plugin, () -> connectPlayerToServer(player, serverName))
+              .delay(2, java.util.concurrent.TimeUnit.SECONDS)
+              .schedule();
+        }
+      }
+    });
   }
 
   private void scheduleInitialIdleCheck(String serverName, String serverId) {
