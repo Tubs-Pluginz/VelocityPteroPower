@@ -147,6 +147,33 @@ public class PlayerConnectionHandler {
       MessageKey key = (initiator != null && initiator.equals(player.getUniqueId()))
           ? MessageKey.CONNECT_SERVER_STARTING_INITIATOR
           : MessageKey.CONNECT_SERVER_STARTING;
+      // If configured, route the player to a limbo instead of denying, and queue them
+      if (configurationManager.isSendToLimboOnStart()) {
+        try {
+          if (plugin.getLobbyBalancerManager() != null) {
+            Optional<RegisteredServer> limboOpt = plugin.getLobbyBalancerManager().pickLimbo();
+            if (limboOpt.isPresent()) {
+              RegisteredServer limbo = limboOpt.get();
+              boolean alreadyOnLimbo = event.getPreviousServer().equals(limbo);
+              if (!alreadyOnLimbo) {
+                logger.info("Server '{}' is already starting. Redirecting {} to limbo '{}' while waiting.",
+                    serverName, player.getUsername(), limbo.getServerInfo().getName());
+                player.sendMessage(messagesManager.prefixed(key, "server", serverName));
+                event.setResult(ServerPreConnectEvent.ServerResult.allowed(limbo));
+              } else {
+                // Already on the chosen limbo; just deny the switch and keep them there
+                player.sendMessage(messagesManager.prefixed(key, "server", serverName));
+                event.setResult(ServerPreConnectEvent.ServerResult.denied());
+              }
+              scheduleDelayedConnect(player, serverName, serverInfo);
+              return;
+            }
+          }
+        } catch (Exception ex) {
+          logger.debug("Limbo selection failed in starting-branch: {}", ex.toString());
+        }
+      }
+      // Fallback: deny the switch and queue as before
       player.sendMessage(messagesManager.prefixed(key, "server", serverName));
       event.setResult(ServerPreConnectEvent.ServerResult.denied());
       logger.debug(
@@ -307,16 +334,16 @@ public class PlayerConnectionHandler {
   }
 
   private Optional<RegisteredServer> findValidLimboServer() {
-    // Try multi-lobby/limbo balancer first and only
+    // Prefer an explicit limbo for sendToLimboOnStart
     try {
       if (plugin.getLobbyBalancerManager() != null) {
-        Optional<RegisteredServer> hold = plugin.getLobbyBalancerManager().pickHoldingServer();
-        if (hold.isPresent()) {
-          return hold;
+        Optional<RegisteredServer> limbo = plugin.getLobbyBalancerManager().pickLimbo();
+        if (limbo.isPresent()) {
+          return limbo;
         }
       }
     } catch (Exception ex) {
-      logger.debug("Balancer selection failed: {}", ex.toString());
+      logger.debug("Balancer limbo selection failed: {}", ex.toString());
     }
     return Optional.empty();
   }
