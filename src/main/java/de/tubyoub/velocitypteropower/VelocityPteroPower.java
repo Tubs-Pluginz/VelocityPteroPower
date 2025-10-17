@@ -62,6 +62,7 @@ public class VelocityPteroPower {
     private ServerLifecycleManager serverLifecycleManager;
     private ServerSwitchListener serverSwitchListener;
     private LobbyBalancerManager lobbyBalancerManager;
+    private de.tubyoub.velocitypteropower.service.LimboTrackerService limboTrackerService;
 
     private FilteredComponentLogger filteredLogger;
 
@@ -126,6 +127,12 @@ public class VelocityPteroPower {
         // Initialize and start lobby/limbo balancer
         this.lobbyBalancerManager = new LobbyBalancerManager(this);
         this.lobbyBalancerManager.startSchedulers();
+        // Initialize limbo tracking service
+        this.limboTrackerService = new de.tubyoub.velocitypteropower.service.LimboTrackerService(this);
+        // Schedule a light periodic sweep to drop stale records
+        this.proxyServer.getScheduler().buildTask(this, () -> {
+            try { if (limboTrackerService != null) limboTrackerService.sweepNow(); } catch (Exception ignored) {}
+        }).delay(Math.max(10, configurationManager.getIdleShutdownCheckInterval()), java.util.concurrent.TimeUnit.SECONDS).schedule();
         // Schedule periodic enforcement of always-online servers
         this.serverLifecycleManager.scheduleAlwaysOnlineMaintenance();
         // Trigger an immediate always-online enforcement once at startup
@@ -433,6 +440,10 @@ public class VelocityPteroPower {
 
     public LobbyBalancerManager getLobbyBalancerManager() {
         return lobbyBalancerManager;
+    }
+
+    public de.tubyoub.velocitypteropower.service.LimboTrackerService getLimboTrackerService() {
+        return limboTrackerService;
     }
 
     public Map<String, UUID> getStartInitiators() {

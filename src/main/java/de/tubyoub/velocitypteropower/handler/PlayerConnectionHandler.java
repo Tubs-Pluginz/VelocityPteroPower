@@ -169,6 +169,8 @@ public class PlayerConnectionHandler {
                 player.sendMessage(messagesManager.prefixed(key, "server", serverName));
                 event.setResult(ServerPreConnectEvent.ServerResult.denied());
               }
+              // Track limbo placement
+              try { var lts = plugin.getLimboTrackerService(); if (lts != null) lts.record(player, limbo, de.tubyoub.velocitypteropower.service.LimboReason.SERVER_START_WAIT, serverName); } catch(Exception ignored) {}
               scheduleDelayedConnect(player, serverName, serverInfo);
               return;
             }
@@ -283,6 +285,8 @@ public class PlayerConnectionHandler {
                 "limbo",
                 limboServer.getServerInfo().getName()));
         event.setResult(ServerPreConnectEvent.ServerResult.allowed(limboServer));
+        // Track limbo placement
+        try { var lts = plugin.getLimboTrackerService(); if (lts != null) lts.record(player, limboServer, de.tubyoub.velocitypteropower.service.LimboReason.SERVER_START_WAIT, serverName); } catch(Exception ignored) {}
         scheduleDelayedConnect(player, serverName, serverInfo);
       }
     } else {
