@@ -218,9 +218,10 @@ public class PlayerConnectionHandler {
       scheduleInitialIdleCheck(serverName, serverId);
     }
 
-    Optional<RegisteredServer> limboServerOpt = findValidLimboServer();
+    boolean useLimbo = configurationManager.isSendToLimboOnStart();
+    Optional<RegisteredServer> limboServerOpt = useLimbo ? findValidLimboServer() : Optional.empty();
 
-    if (limboServerOpt.isPresent()) {
+    if (useLimbo && limboServerOpt.isPresent()) {
       RegisteredServer limboServer = limboServerOpt.get();
       // If the player is already on the selected limbo, avoid re-sending them there to prevent Velocity errors
       boolean alreadyOnLimbo = event.getPreviousServer() != null && event.getPreviousServer().equals(limboServer);
@@ -256,8 +257,44 @@ public class PlayerConnectionHandler {
     } else {
       String baseMsgKey = MessageKey.CONNECT_STARTING_SERVER_DISCONNECT.getPath();
       if (event.getPreviousServer() == null) {
+        // Forced-host join case. Consult forcedHostOfflineBehavior to avoid disconnecting if possible.
+        var behavior = configurationManager.getForcedHostOfflineBehavior();
+
+        Optional<RegisteredServer> holdingOpt = Optional.empty();
+        try {
+          if (plugin.getLobbyBalancerManager() != null) {
+            switch (behavior) {
+              case LOBBY_OR_LIMBO -> {
+                holdingOpt = plugin.getLobbyBalancerManager().pickHoldingServer();
+              }
+              case LIMBO_ONLY -> {
+                holdingOpt = plugin.getLobbyBalancerManager().pickHoldingServer()
+                    .filter(rs -> configurationManager.getBalancerLimbos()
+                        .contains(rs.getServerInfo().getName()));
+              }
+              case DISCONNECT -> { /* fall through to disconnect below */ }
+            }
+          }
+        } catch (Exception ex) {
+          logger.debug("Holding selection failed: {}", ex.toString());
+        }
+
+        if (holdingOpt.isPresent()) {
+          RegisteredServer holding = holdingOpt.get();
+          logger.info("Forced-host: redirecting {} to holding '{}' while '{}' starts.",
+              player.getUsername(), holding.getServerInfo().getName(), serverName);
+
+          // Inform and queue
+          player.sendMessage(messagesManager.prefixed(
+              MessageKey.CONNECT_SERVER_STARTING, "server", serverName));
+
+          event.setResult(ServerPreConnectEvent.ServerResult.allowed(holding));
+          scheduleDelayedConnect(player, serverName, serverInfo);
+          return;
+        }
+
         logger.info(
-            "Disconnecting player {} while server '{}' starts (Limbo not available/usable).",
+            "Forced-host: no holding available. Disconnecting {} while '{}' starts.",
             player.getUsername(),
             serverName);
         player.disconnect(messagesManager.prefixed(baseMsgKey, "server", serverName));
@@ -300,15 +337,24 @@ public class PlayerConnectionHandler {
 
               @Override
               public void run() {
-                if (!initialConnection.equals(player.getCurrentServer()) && initialConnection.isPresent()) {
-                    logger.info("Player {} already connected to a different Server: {}. Connection attempt to Server: {} is beeing aborted", 
-                            player.getUsername(), 
-                            player.getCurrentServer().toString(), 
-                            targetServerName);
-                    startingServers.remove(targetServerName);
-                    plugin.getStartingServersSince().remove(targetServerName);
-                    startInitiators.remove(targetServerName);
-                  return;
+                // Abort only if the player moved to a non-holding, non-target server while waiting
+                if (initialConnection.isPresent()) {
+                  String currentName = player.getCurrentServer()
+                      .map(cs -> cs.getServer().getServerInfo().getName())
+                      .orElse("");
+
+                  java.util.Set<String> limbos = new java.util.HashSet<>(configurationManager.getBalancerLimbos());
+                  java.util.Set<String> lobbies = new java.util.HashSet<>(configurationManager.getBalancerLobbies());
+
+                  boolean onHolding = limbos.contains(currentName) || lobbies.contains(currentName);
+                  boolean onTarget = currentName.equalsIgnoreCase(targetServerName);
+                  boolean sameAsInitial = initialConnection.equals(player.getCurrentServer());
+
+                  if (!onHolding && !onTarget && !sameAsInitial) {
+                    logger.info("Player {} moved to '{}' while waiting for '{}'. Not a lobby/limbo/target — cancelling their auto-connect.",
+                        player.getUsername(), currentName, targetServerName);
+                    return; // Do NOT clear global starting markers here — this is a per-player cancellation only
+                  }
                 }
                 if (!player.isActive() || player.getCurrentServer().isEmpty()) {
                   logger.info(

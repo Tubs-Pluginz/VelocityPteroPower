@@ -35,6 +35,12 @@ public class ConfigurationManager {
         PANEL_API
     }
 
+    public enum ForcedHostOfflineBehavior {
+        DISCONNECT,
+        LOBBY_OR_LIMBO,
+        LIMBO_ONLY
+    }
+
     private Path dataDirectory;
     private YamlDocument config;
     private String panelUrl;
@@ -84,6 +90,8 @@ public class ConfigurationManager {
     private int balancerPreStartThresholdPercent;
     private int balancerStartFailureFallbackSeconds;
     private int balancerStartFailureCooldownSeconds;
+    private boolean sendToLimboOnStart;
+    private ForcedHostOfflineBehavior forcedHostOfflineBehavior = ForcedHostOfflineBehavior.DISCONNECT;
 
     private final VelocityPteroPower plugin;
     private final Logger logger;
@@ -124,6 +132,7 @@ public class ConfigurationManager {
                                         .addIgnoredRoute("10", "servers", '.')
                                         .addIgnoredRoute("11", "servers", '.')
                                         .addIgnoredRoute("12", "servers", '.')
+                                        .addIgnoredRoute("13", "servers", '.')
                                         .build());
 
 
@@ -182,6 +191,14 @@ public class ConfigurationManager {
                 balancerPreStartThresholdPercent = lb.getInt("preStartThresholdPercent", 80);
                 balancerStartFailureFallbackSeconds = lb.getInt("startFailureFallbackSeconds", 60);
                 balancerStartFailureCooldownSeconds = lb.getInt("startFailureCooldownSeconds", 120);
+                sendToLimboOnStart = lb.getBoolean("sendToLimboOnStart", false);
+                String fho = lb.getString("forcedHostOfflineBehavior", "DISCONNECT");
+                try {
+                    forcedHostOfflineBehavior = ForcedHostOfflineBehavior.valueOf(fho.toUpperCase(Locale.ROOT));
+                } catch (Exception ex) {
+                    forcedHostOfflineBehavior = ForcedHostOfflineBehavior.LOBBY_OR_LIMBO;
+                    logger.warn("Invalid forcedHostOfflineBehavior '{}' in config. Defaulting to LOBBY_OR_LIMBO.", fho);
+                }
             } else {
                 // defaults
                 balancerLobbies = Collections.emptyList();
@@ -197,6 +214,8 @@ public class ConfigurationManager {
                 balancerPreStartThresholdPercent = 80;
                 balancerStartFailureFallbackSeconds = 60;
                 balancerStartFailureCooldownSeconds = 120;
+                sendToLimboOnStart = false;
+                forcedHostOfflineBehavior = ForcedHostOfflineBehavior.LOBBY_OR_LIMBO;
             }
 
             // Migrate legacy 'limboServer' to 'lobbyBalancer.limbos'
@@ -360,6 +379,8 @@ public class ConfigurationManager {
     public int getBalancerPreStartThresholdPercent() { return balancerPreStartThresholdPercent <= 0 ? 80 : Math.min(100, balancerPreStartThresholdPercent); }
     public int getBalancerStartFailureFallbackSeconds() { return balancerStartFailureFallbackSeconds <= 0 ? 60 : balancerStartFailureFallbackSeconds; }
     public int getBalancerStartFailureCooldownSeconds() { return balancerStartFailureCooldownSeconds <= 0 ? 120 : balancerStartFailureCooldownSeconds; }
+    public boolean isSendToLimboOnStart() { return sendToLimboOnStart; }
+    public ForcedHostOfflineBehavior getForcedHostOfflineBehavior() { return forcedHostOfflineBehavior; }
 
     /**
      * This method returns the Pterodactyl URL.

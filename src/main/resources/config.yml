@@ -4,7 +4,7 @@
 ################################
 
 # Version of the configuration file
-fileversion: 12
+fileversion: 13
 
 # Check for updates
 # If true, the plugin will check for updates on startup.
@@ -215,6 +215,17 @@ lobbyBalancer:
   # After a failed start, wait this many seconds before trying that same lobby again.
   # default = 120
   startFailureCooldownSeconds: 120
+
+  # When a target server is starting, send players to a limbo (if available) and auto-queue them.
+  # If false, players will stay on their current server (or be disconnected if coming from proxy) while queued.
+  # default = false
+  sendToLimboOnStart: false
+
+  # Behavior for forced-host joins when the target backend is offline
+  # DISCONNECT       → disconnect (default)
+  # LOBBY_OR_LIMBO  → try a lobby first, then a limbo; if none, disconnect
+  # LIMBO_ONLY      → only try limbo; if none, disconnect
+  forcedHostOfflineBehavior: LOBBY_OR_LIMBO
 
 # Panel configuration
 pterodactyl:
