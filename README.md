@@ -37,20 +37,27 @@
 -   `/ptero start <serverName>`
 -   `/ptero stop <serverName>`
 -   `/ptero restart <serverName>`
+-   `/ptero list`
+-   `/ptero info <serverName>`
 -   `/ptero reload`
 -   `/ptero whitelistReload`
--   `/ptero stopIdle`
--   `/ptero forcestopall`
+-   `/ptero stopidle`
+-   `/ptero forcestopall [confirm]`
+-   `/ptero forcestartall [confirm]`
 
 ## Permissions
 -   `ptero.start`
 -   `ptero.stop`
 -   `ptero.restart`
+-   `ptero.list`
+-   `ptero.info`
 -   `ptero.whitelistReload`
 -   `ptero.reload`
 -   `ptero.stopIdle`
 -   `ptero.forcestopall`
+-   `ptero.forcestartall`
 -   `ptero.bypass` (to bypass VPP whitelist checks if enabled)
+-   `ptero.maxcap.bypass` (to bypass the maxOnlineServers cap if enabled)
 
 ## Installation
 1.  Download the latest `.jar` file from [Modrinth](https://modrinth.com/plugin/velocitypteropower). 
