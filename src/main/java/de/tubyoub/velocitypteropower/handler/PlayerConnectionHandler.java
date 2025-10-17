@@ -4,6 +4,7 @@ import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.player.ServerPreConnectEvent;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
 import de.tubyoub.velocitypteropower.api.PanelAPIClient;
@@ -283,8 +284,8 @@ public class PlayerConnectionHandler {
   }
 
   private void scheduleDelayedConnect(
-      Player player, String targetServerName, PteroServerInfo targetServerInfo) {
-    String currentServer = player.getCurrentServer().toString();
+    Player player, String targetServerName, PteroServerInfo targetServerInfo) {
+    Optional<ServerConnection> initialConnection = player.getCurrentServer();
     long initialDelay = configurationManager.getStartupInitialCheckDelay();
     long checkInterval = Math.max(5, targetServerInfo.getJoinDelay());
 
@@ -298,7 +299,7 @@ public class PlayerConnectionHandler {
 
               @Override
               public void run() {
-                if (!currentServer.equals(player.getCurrentServer())) {
+                if (!initialConnection.equals(player.getCurrentServer()) && initialConnection.isPresent()) {
                     logger.info("Player {} already connected to a different Server: {}. Connection attempt to Server: {} is beeing aborted", 
                             player.getUsername(), 
                             player.getCurrentServer().toString(), 
