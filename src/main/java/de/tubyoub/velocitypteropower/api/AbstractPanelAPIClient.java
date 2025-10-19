@@ -48,7 +48,15 @@ public abstract class AbstractPanelAPIClient implements PanelAPIClient {
         this.proxyServer = plugin.getProxyServer();
         this.rateLimitTracker = plugin.getRateLimitTracker();
 
-        this.executorService = Executors.newFixedThreadPool(configurationManager.getApiThreads());
+        int configuredThreads = configurationManager.getApiThreads();
+        int servers = 0;
+        try {
+            java.util.Map<String, de.tubyoub.velocitypteropower.model.PteroServerInfo> map = plugin.getServerInfoMap();
+            if (map != null) servers = map.size();
+        } catch (Exception ignored) {}
+        int computedThreads = Math.max(configuredThreads, Math.max(4, Math.min(64, servers * 2)));
+        this.executorService = java.util.concurrent.Executors.newFixedThreadPool(computedThreads);
+        logger.info("API executor threads: configured={}, servers={}, using={}", configuredThreads, servers, computedThreads);
         this.httpClient = HttpClient.newBuilder()
                 .executor(executorService)
                 .connectTimeout(Duration.ofSeconds(10))

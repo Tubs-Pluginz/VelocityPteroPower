@@ -268,7 +268,7 @@ public class ConfigurationManager {
             Map<String, Object> pterodactyl = new HashMap<>();
             if (pterodactylSection != null) {
                 for (Object keyObj : pterodactylSection.getKeys()) {
-                    String key = (String) keyObj;
+                    String key = String.valueOf(keyObj);
                     Route route = Route.fromString(key);
                     Object value = pterodactylSection.get(route);
                     pterodactyl.put(key, value);
@@ -303,7 +303,7 @@ public class ConfigurationManager {
     public Map<String, PteroServerInfo> processServerSection(Section serversSection) {
             Map<String, PteroServerInfo> serverInfoMap = new HashMap<>();
             for (Object keyObj : serversSection.getKeys()) {
-                String key = (String) keyObj;
+                String key = String.valueOf(keyObj);
                 Route route = Route.fromString(key);
                 Object serverInfoDataObj = serversSection.get(route);
                 if (serverInfoDataObj instanceof Section) {

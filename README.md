@@ -39,6 +39,7 @@
 -   `/ptero restart <serverName>`
 -   `/ptero list`
 -   `/ptero info <serverName>`
+-   `/ptero apithreads`
 -   `/ptero reload`
 -   `/ptero whitelistReload`
 -   `/ptero stopidle`

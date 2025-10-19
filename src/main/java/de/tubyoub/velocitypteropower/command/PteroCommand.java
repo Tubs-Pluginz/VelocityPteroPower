@@ -146,6 +146,14 @@ public class PteroCommand implements SimpleCommand {
                 }
                 break;
 
+            case "apithreads":
+                if (sender.hasPermission("ptero.info")) {
+                    showApiThreadsInfo(sender);
+                } else {
+                    sender.sendMessage(messages.prefixed(MessageKey.COMMAND_NO_PERMISSION));
+                }
+                break;
+
             default:
                 sender.sendMessage(
                         messages.prefixed(
@@ -730,6 +738,30 @@ public class PteroCommand implements SimpleCommand {
         });
     }
 
+    private void showApiThreadsInfo(CommandSource sender) {
+        int configured = configurationManager.getApiThreads();
+        int servers = 0;
+        try {
+            Map<String, PteroServerInfo> map = plugin.getServerInfoMap();
+            if (map != null) servers = map.size();
+        } catch (Exception ignored) {}
+        int baseline = Math.max(4, Math.min(64, servers * 2));
+        int finalThreads = Math.max(configured, baseline);
+        boolean overridden = configured > baseline;
+
+        String bodyMm =
+            "<yellow>API Threads Info</yellow><newline>" +
+            "  <gray>Configured (apiThreads):</gray> <green>" + configured + "</green><newline>" +
+            "  <gray>Servers detected:</gray> <aqua>" + servers + "</aqua><newline>" +
+            "  <gray>Auto baseline (2x servers, clamped 4..64):</gray> <gold>" + baseline + "</gold><newline>" +
+            "  <gray>Using threads:</gray> <yellow>" + finalThreads + "</yellow>" +
+            (overridden ? " <gray>(configured overrides baseline)</gray>" : "") + "<newline>" +
+            "<gray>Tip:</gray> set <yellow>apiThreads</yellow> higher to override the auto baseline; reload/restart to apply.";
+
+        sender.sendMessage(messages.prefixed(MessageKey.GENERIC_SUCCESS, "message", bodyMm));
+    }
+
+
     private String formatDurationShort(long millis) {
         if (millis < 0) millis = 0;
         long seconds = millis / 1000;
@@ -790,6 +822,7 @@ public class PteroCommand implements SimpleCommand {
             if (sender.hasPermission("ptero.restart")) subs.add("restart");
             if (sender.hasPermission("ptero.list")) subs.add("list");
             if (sender.hasPermission("ptero.info")) subs.add("info");
+            if (sender.hasPermission("ptero.info")) subs.add("apithreads");
             if (sender.hasPermission("ptero.history")) subs.add("history");
             if (sender.hasPermission("ptero.stopIdle")) subs.add("stopidle");
             if (sender.hasPermission("ptero.whitelistReload")) subs.add("whitelistReload");
@@ -847,6 +880,7 @@ public class PteroCommand implements SimpleCommand {
         sender.sendMessage(Component.text("/ptero restart <serverName>"));
         sender.sendMessage(Component.text("/ptero list"));
         sender.sendMessage(Component.text("/ptero info <serverName>"));
+        sender.sendMessage(Component.text("/ptero apithreads"));
         sender.sendMessage(Component.text("/ptero history [playerName|uuid]"));
         sender.sendMessage(Component.text("/ptero stopidle"));
         sender.sendMessage(Component.text("/ptero forcestopall"));

@@ -27,10 +27,10 @@ languageOverride: auto
 #default: 20
 loggerLevel: 20
 
-# How many Threads should be used to check the server status
-# The more threads the more requests can be handled at the same time
-# more threads = more resources used
-# restart the server so changes take effect
+# How many threads the API client should use for HTTP work.
+# VPP auto-scales threads to roughly 2x the number of configured servers (clamped between 4 and 64).
+# If you set apiThreads higher than that baseline, your configured value overrides the baseline.
+# More threads = more parallel requests but also more resource usage. Restart/reload to apply.
 # default: 10
 apiThreads: 10
 
