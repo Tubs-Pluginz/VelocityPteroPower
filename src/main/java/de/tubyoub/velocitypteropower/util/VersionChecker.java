@@ -120,14 +120,18 @@ public class VersionChecker {
      * @return A positive number if version1 is newer, 0 if they are equal, and a negative number if version2 is newer.
      */
     private static int compareVersions(String version1, String version2) {
-        String[] parts1 = version1.split("\\.");
-        String[] parts2 = version2.split("\\.");
+        // Strip pre-release ("-") and build metadata ("+") suffixes before numeric comparison
+        String clean1 = sanitizeVersion(version1);
+        String clean2 = sanitizeVersion(version2);
+
+        String[] parts1 = clean1.split("\\.");
+        String[] parts2 = clean2.split("\\.");
 
         int length = Math.max(parts1.length, parts2.length);
 
         for (int i = 0; i < length; i++) {
-            int v1 = i < parts1.length ? Integer.parseInt(parts1[i]) : 0;
-            int v2 = i < parts2.length ? Integer.parseInt(parts2[i]) : 0;
+            int v1 = i < parts1.length ? safeParseInt(parts1[i]) : 0;
+            int v2 = i < parts2.length ? safeParseInt(parts2[i]) : 0;
 
             if (v1 != v2) {
                 return v1 - v2;
@@ -135,5 +139,26 @@ public class VersionChecker {
         }
 
         return 0;
+    }
+
+    private static String sanitizeVersion(String version) {
+        if (version == null) return "0";
+        // Remove anything after '-' (pre-release) and '+' (build metadata)
+        String base = version.split("-", 2)[0];
+        base = base.split("\\+", 2)[0];
+        return base.trim();
+    }
+
+    private static int safeParseInt(String s) {
+        // Extract leading numeric portion; fallback to 0 if not numeric
+        if (s == null || s.isEmpty()) return 0;
+        int i = 0, n = s.length();
+        while (i < n && Character.isDigit(s.charAt(i))) i++;
+        if (i == 0) return 0;
+        try {
+            return Integer.parseInt(s.substring(0, i));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

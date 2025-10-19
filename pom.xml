@@ -6,7 +6,7 @@
 
     <groupId>de.tubyoub</groupId>
     <artifactId>VelocityPteroPower</artifactId>
-    <version>0.9.4</version>
+    <version>0.9.5</version>
 
     <packaging>jar</packaging>
 
@@ -18,6 +18,19 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <maven.compiler.release>21</maven.compiler.release>
+        <!-- Keep dependency versions explicit -->
+        <adventure.version>4.14.0</adventure.version>
+        <minimessage.version>4.24.0</minimessage.version>
+        <velocity.api.version>3.4.0-SNAPSHOT</velocity.api.version>
+        <boostedyaml.version>1.3.1</boostedyaml.version>
+        <jackson.databind.version>2.16.0</jackson.databind.version>
+        <shade.plugin.version>3.5.1</shade.plugin.version>
+        <compiler.plugin.version>3.11.0</compiler.plugin.version>
+        <templating.plugin.version>1.0.0</templating.plugin.version>
+        <site.plugin.version>3.12.1</site.plugin.version>
+        <wagon.git.version>2.0.4</wagon.git.version>
+        <doxia.markdown.version>1.9.1</doxia.markdown.version>
+        <release.plugin.version>3.0.1</release.plugin.version>
     </properties>
 
     <profiles>
@@ -25,10 +38,10 @@
             <id>beta</id>
             <build>
                 <resources>
-                  <resource>
-                    <directory>src/main/resources</directory>
-                    <filtering>true</filtering>
-                  </resource>
+                    <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                    </resource>
                 </resources>
             </build>
         </profile>
@@ -50,7 +63,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.1</version>
+                <version>${shade.plugin.version}</version>
                 <configuration>
                     <filters>
                         <filter>
@@ -76,19 +89,22 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+                <version>${compiler.plugin.version}</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <release>${java.version}</release>
                 </configuration>
             </plugin>
+
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>templating-maven-plugin</artifactId>
-                <version>1.0.0</version>
+                <version>${templating.plugin.version}</version>
                 <executions>
                     <execution>
                         <id>filter-src</id>
@@ -98,38 +114,39 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-site-plugin</artifactId>
-                <version>3.12.1</version>
+                <version>${site.plugin.version}</version>
                 <dependencies>
                     <dependency>
                         <groupId>net.trajano.wagon</groupId>
                         <artifactId>wagon-git</artifactId>
-                        <version>2.0.4</version>
+                        <version>${wagon.git.version}</version>
                     </dependency>
                     <dependency>
                         <groupId>org.apache.maven.doxia</groupId>
                         <artifactId>doxia-module-markdown</artifactId>
-                        <version>1.9.1</version>
+                        <version>${doxia.markdown.version}</version>
                     </dependency>
                 </dependencies>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
-                <version>3.0.1</version>
+                <version>${release.plugin.version}</version>
                 <configuration>
                     <autoVersionSubmodules>true</autoVersionSubmodules>
                     <tagNameFormat>@{project.version}</tagNameFormat>
                     <scmCommentPrefix xml:space="preserve">[RELEASE] </scmCommentPrefix>
-                    <goals>install deploy site-deploy</goals> <!-- install is here to fix javadoc generation in multi-module projects -->
+                    <goals>install deploy site-deploy</goals>
                     <releaseProfiles>release</releaseProfiles>
                 </configuration>
             </plugin>
         </plugins>
     </build>
-
 
     <repositories>
         <repository>
@@ -142,18 +159,27 @@
         <dependency>
             <groupId>com.velocitypowered</groupId>
             <artifactId>velocity-api</artifactId>
-            <version>3.4.0-SNAPSHOT</version>
+            <version>${velocity.api.version}</version>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
             <groupId>dev.dejvokep</groupId>
             <artifactId>boosted-yaml</artifactId>
-            <version>1.3.1</version>
+            <version>${boostedyaml.version}</version>
         </dependency>
+
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.16.0</version>
+            <version>${jackson.databind.version}</version>
+        </dependency>
+
+        <!-- Adventure MiniMessage for rendering Components from strings -->
+        <dependency>
+            <groupId>net.kyori</groupId>
+            <artifactId>adventure-text-minimessage</artifactId>
+            <version>${minimessage.version}</version>
         </dependency>
     </dependencies>
 </project>

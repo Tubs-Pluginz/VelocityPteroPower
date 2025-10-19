@@ -1,0 +1,63 @@
+# VelocityPteroPower messages - English (US), MiniMessage
+fileversion: 2
+
+# Use MiniMessage for styling. You can add gradients, hover, click, etc.
+# Example gradient prefix:
+prefix: "<gradient:#42A5F5:#00E5FF><bold>VPP</bold></gradient>"
+
+generic:
+  success: "<green>Success:</green> <white><message></white>"
+  error: "<red>Error:</red> <white><message></white>"
+  reload-success: "<green>Configuration and messages reloaded.</green>"
+  reload-failed: "<red>Failed to reload. Check console.</red>"
+
+command:
+  no-permission: "<red>You do not have permission to perform this command.</red>"
+  player-only: "<red>Only players can use this command.</red>"
+  console-only: "<red>Only the console can use this command.</red>"
+  usage: "<gray>Usage:</gray> <yellow>/<usage></yellow>"
+  unknown-subcommand: "<red>Unknown subcommand:</red> <yellow><sub></yellow>"
+  mcss-not-supported: "<red>Mc Server Soft does not support this command.</red>"
+  no-servers-found: "<red>No servers found in configuration to stop.</red>"
+  rate-limit-exceeded: "<red>API rate limit exceeded. Not all servers could be stopped.</red>"
+  stopping-all-servers: "<gray>Stopping all</gray> <yellow><count></yellow> <gray>servers. This may take some time.</gray>"
+  force-stopping-all-servers: "<gray>Force-stopping</gray> <yellow><count></yellow> <gray>servers. This may take some time.</gray>"
+  force-starting-all-servers: "<gray>Force-starting</gray> <yellow><count></yellow> <gray>servers. This may use a lot of resources.</gray>"
+  force-start-warning: "<red>Warning:</red> <gray>This will start ALL managed backend servers. Ensure your host has enough resources to handle this load.</gray>"
+  cooldown-active: "<yellow>You are on cooldown. Please wait <timeout> seconds before trying again.</yellow>"
+  help-header: "<green>VelocityPteroPower commands:</green>"
+  list-header: "<gradient:#42A5F5:#00E5FF><bold>Managed Servers</bold></gradient> <gray>(status | players | TTL)</gray>"
+  list-entry: "<gray>•</gray> <aqua><server></aqua> <gray>|</gray> <status_formatted> <gray>|</gray> <yellow><players></yellow> <gray>players</gray> <gray>| TTL:</gray> <yellow><ttl></yellow>"
+  info-header: "<gradient:#00E5FF:#42A5F5><bold>Server Info:</bold> <server></gradient>"
+  info-not-found: "<red>Server '<server>' is not managed by VelocityPteroPower.</red>"
+  info-body: "<gray>Status:</gray> <status_formatted>\n<gray>Players:</gray> <yellow><players></yellow>\n<gray>CPU:</gray> <cpu>\n<gray>Memory:</gray> <memory>\n<gray>Disk:</gray> <disk>\n<gray>Net:</gray> <yellow><rx></yellow> <gray>in</gray>, <yellow><tx></yellow> <gray>out</gray>\n<gray>Uptime:</gray> <yellow><uptime></yellow>" 
+
+connect:
+  unmanaged-server: "<red>Server not found in configuration:</red> <yellow><server></yellow>"
+  server-starting: "<yellow>Server '<server>' is already starting.</yellow>"
+  server-starting-initiator: "<yellow>You’ve started server '<server>'. Please wait while it boots...</yellow>"
+  error-rate-limited: "<red>Server startup is delayed due to API limits. Please wait or try again later.</red>"
+  redirecting-to-limbo: "<gray>Server '<server>' is starting. Sending you to</gray> <aqua><limbo></aqua><gray>...</gray>"
+  starting-server-disconnect: "<gray>Server '<server>' is starting up. Please try connecting again in a moment.</gray>"
+  start-timeout: "<red>Server '<server>' did not start in time.</red>"
+  target-server-not-found: "<red>Target server '<server>' is not available.</red>"
+  not-whitelisted: "<red>You are not whitelisted on this server.</red>"
+  max-online-reached: "<red>Cannot start server.</red> <gray>Maximum number of online servers reached (</gray><yellow><max></yellow><gray>).</gray>" 
+
+server:
+  starting: "<gray>Server is starting...</gray>"
+  started: "<green>Server started.</green>"
+  stopping: "<gray>Server is stopping...</gray>"
+  stopped: "<red>Server stopped.</red>"
+  idle-shutdown: "<gray>Server <yellow><server></yellow> has been shutdown because no one joined it</gray>"
+  shutdown-scheduled: "<gray>Scheduling server shutdown for</gray> <yellow><server></yellow> <gray>in</gray> <yellow><timeout></yellow> <gray>seconds.</gray>"
+  shutdown-cancelled-players: "<yellow>Shutdown cancelled for server:</yellow> <yellow><server></yellow><gray>. Players are present.</gray>"
+  shutdown-cancelled: "<yellow>Shutdown cancelled for server:</yellow> <yellow><server></yellow><gray>. Reason:</gray> <yellow><reason></yellow>"
+  shutdown-success: "<green>Server</green> <yellow><server></yellow> <green>has been successfully shutdown.</green>"
+  shutdown-failed: "<red>Failed to shutdown server:</red> <yellow><server></yellow><red>. After</red> <yellow><retry></yellow><red>.</red>"
+  still-online-retrying: "<yellow>Server</yellow> <yellow><server></yellow> <yellow>is still online. Retrying shutdown.</yellow> <gray>(attempt:</gray> <yellow><retry></yellow><gray>/</gray><yellow><maxretries></yellow><gray>).</gray>"
+
+power:
+  action-sent: "<gray>Sent power action</gray> '<yellow><action></yellow>' <gray>to server</gray> '<yellow><server></yellow>'."
+  action-failed: "<red>Failed to execute power action</red> '<yellow><action></yellow>' <red>on server</red> '<yellow><server></yellow>': <gray><reason></gray>"
+  status: "<gray>Server</gray> '<yellow><server></yellow>' <gray>status:</gray> <yellow><status></yellow>"

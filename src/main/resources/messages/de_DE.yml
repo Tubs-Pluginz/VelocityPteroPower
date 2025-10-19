@@ -1,0 +1,63 @@
+# VelocityPteroPower Nachrichten - Deutsch (DE), MiniMessage
+fileversion: 2
+
+# Use MiniMessage for styling. You can add gradients, hover, click, etc.
+# Example gradient prefix:
+prefix: "<gradient:#42A5F5:#00E5FF><bold>VPP</bold></gradient>"
+
+generic:
+  success: "<green>Erfolg:</green> <white><message></white>"
+  error: "<red>Fehler:</red> <white><message></white>"
+  reload-success: "<green>Konfiguration und Nachrichten neu geladen.</green>"
+  reload-failed: "<red>Neuladen fehlgeschlagen. Siehe Konsole.</red>"
+
+command:
+  no-permission: "<red>Du hast keine Berechtigung für diesen Befehl.</red>"
+  player-only: "<red>Nur Spieler können diesen Befehl verwenden.</red>"
+  console-only: "<red>Nur die Konsole kann diesen Befehl verwenden.</red>"
+  usage: "<gray>Benutzung:</gray> <yellow>/<usage></yellow>"
+  unknown-subcommand: "<red>Unbekannter Unterbefehl:</red> <yellow><sub></yellow>"
+  mcss-not-supported: "<red>Mc Server Soft unterstützt diesen Befehl nicht.</red>"
+  no-servers-found: "<red>Keine Server in der Konfiguration zum Stoppen gefunden.</red>"
+  rate-limit-exceeded: "<red>API-Rate-Limit überschritten. Nicht alle Server konnten gestoppt werden.</red>"
+  stopping-all-servers: "<gray>Stoppe</gray> <yellow><count></yellow> <gray>Server. Dies kann einige Zeit dauern.</gray>"
+  force-stopping-all-servers: "<gray>Erzwinge das Stoppen von</gray> <yellow><count></yellow> <gray>Servern. Dies kann einige Zeit dauern.</gray>"
+  force-starting-all-servers: "<gray>Erzwinge das Starten von</gray> <yellow><count></yellow> <gray>Servern. Dies kann viele Ressourcen verbrauchen.</gray>"
+  force-start-warning: "<red>Warnung:</red> <gray>Dies startet ALLE verwalteten Backend-Server. Stelle sicher, dass dein Host genügend Ressourcen hat.</gray>"
+  cooldown-active: "<yellow>Du hast eine Abklingzeit. Bitte warte <timeout> Sekunden.</yellow>"
+  help-header: "<green>VelocityPteroPower Befehle:</green>"
+  list-header: "<gradient:#42A5F5:#00E5FF><bold>Verwaltete Server</bold></gradient> <gray>(Status | Spieler | TTL)</gray>"
+  list-entry: "<gray>•</gray> <aqua><server></aqua> <gray>|</gray> <status_formatted> <gray>|</gray> <yellow><players></yellow> <gray>Spieler</gray> <gray>| TTL:</gray> <yellow><ttl></yellow>"
+  info-header: "<gradient:#00E5FF:#42A5F5><bold>Server-Info:</bold> <server></gradient>"
+  info-not-found: "<red>Server '<server>' wird nicht von VelocityPteroPower verwaltet.</red>"
+  info-body: "<gray>Status:</gray> <status_formatted>\n<gray>Spieler:</gray> <yellow><players></yellow>\n<gray>CPU:</gray> <cpu>\n<gray>Arbeitsspeicher:</gray> <memory>\n<gray>Festplatte:</gray> <disk>\n<gray>Netz:</gray> <yellow><rx></yellow> <gray>rein</gray>, <yellow><tx></yellow> <gray>raus</gray>\n<gray>Laufzeit:</gray> <yellow><uptime></yellow>" 
+
+connect:
+  unmanaged-server: "<red>Server nicht in der Konfiguration gefunden:</red> <yellow><server></yellow>"
+  server-starting: "<yellow>Server '<server>' startet bereits.</yellow>"
+  server-starting-initiator: "<yellow>Du hast den Server '<server>' gestartet. Bitte warte, bis er hochgefahren ist...</yellow>"
+  error-rate-limited: "<red>Serverstart verzögert sich aufgrund von API-Limits. Bitte warte oder versuche es später erneut.</red>"
+  redirecting-to-limbo: "<gray>Server '<server>' startet. Du wirst zu</gray> <aqua><limbo></aqua> <gray>gesendet...</gray>"
+  starting-server-disconnect: "<gray>Server '<server>' startet. Bitte versuche es in einem Moment erneut.</gray>"
+  start-timeout: "<red>Server '<server>' ist nicht rechtzeitig gestartet.</red>"
+  target-server-not-found: "<red>Zielserver '<server>' ist nicht verfügbar.</red>"
+  not-whitelisted: "<red>Du bist auf diesem Server nicht auf der Whitelist.</red>"
+  max-online-reached: "<red>Server kann nicht gestartet werden.</red> <gray>Maximale Anzahl gleichzeitig laufender Server erreicht (</gray><yellow><max></yellow><gray>).</gray>"
+
+server:
+  starting: "<gray>Server startet...</gray>"
+  started: "<green>Server gestartet.</green>"
+  stopping: "<gray>Server wird gestoppt...</gray>"
+  stopped: "<red>Server gestoppt.</red>"
+  idle-shutdown: "<gray>Server <yellow><server></yellow> wurde heruntergefahren, da niemand beigetreten ist</gray>"
+  shutdown-scheduled: "<gray>Herunterfahren in</gray> <yellow><timeout></yellow> <gray>Sekunden für Server</gray> <yellow><server></yellow><gray> geplant.</gray>"
+  shutdown-cancelled-players: "<yellow>Herunterfahren abgebrochen für Server:</yellow> <yellow><server></yellow><gray>. Spieler sind online.</gray>"
+  shutdown-cancelled: "<yellow>Herunterfahren abgebrochen für Server:</yellow> <yellow><server></yellow><gray>. Grund:</gray> <yellow><reason></yellow>"
+  shutdown-success: "<green>Server</green> <yellow><server></yellow> <green>erfolgreich heruntergefahren.</green>"
+  shutdown-failed: "<red>Herunterfahren fehlgeschlagen für Server:</red> <yellow><server></yellow><red>. Nach</red> <yellow><retry></yellow><red>.</red>"
+  still-online-retrying: "<yellow>Server</yellow> <yellow><server></yellow> <yellow>ist noch online. Erneuter Versuch.</yellow> <gray>(Versuch:</gray> <yellow><retry></yellow><gray>/</gray><yellow><maxretries></yellow><gray>).</gray>"
+
+power:
+  action-sent: "<gray>Sende Aktion</gray> '<yellow><action></yellow>' <gray>an Server</gray> '<yellow><server></yellow>'."
+  action-failed: "<red>Aktion fehlgeschlagen</red> '<yellow><action></yellow>' <red>auf Server</red> '<yellow><server></yellow>': <gray><reason></gray>"
+  status: "<gray>Status von Server</gray> '<yellow><server></yellow>': <yellow><status></yellow>"

@@ -1,15 +1,21 @@
 ################################
 #      VelocityPteroPower      #
-#         by TubYoub           #
+#         by TubYoub            #
 ################################
 
 # Version of the configuration file
-fileversion: 8
+fileversion: 14
 
 # Check for updates
 # If true, the plugin will check for updates on startup.
 # If a new version is available, a message will be sent to the console and to players with the permission "ptero.reload".
 checkUpdate: true
+
+# Override the language used for plugin messages.
+# Set to a locale like "en_US" or "de_DE" to force a specific language.
+# Use "auto" to follow the environment (system/Velocity) language.
+# default: auto
+languageOverride: auto
 
 # Choose which logging level should be used
 # It depends on how much you want you're console to be filled with information from VPP
@@ -21,10 +27,10 @@ checkUpdate: true
 #default: 20
 loggerLevel: 20
 
-# How many Threads should be used to check the server status
-# The more threads the more requests can be handled at the same time
-# more threads = more resources used
-# restart the server so changes take effect
+# How many threads the API client should use for HTTP work.
+# VPP auto-scales threads to roughly 2x the number of configured servers (clamped between 4 and 64).
+# If you set apiThreads higher than that baseline, your configured value overrides the baseline.
+# More threads = more parallel requests but also more resource usage. Restart/reload to apply.
 # default: 10
 apiThreads: 10
 
@@ -65,11 +71,6 @@ idleStartShutdownTime: 300
 # default: 10
 playerStartCooldown: 10
 
-# Server Name from your limbo
-# should be a configured server so it can be automatically started
-# changeMe = not configured so limbo server won't be used
-limboServer: changeMe
-
 # How long (in seconds) the plugin should wait for the first check if the server is online
 # The joinDelay (configured for each server) is still applied when the server is online before a
 # player is automatically connected (so it doesn't affect this)
@@ -99,6 +100,141 @@ whitelistAllowBypass: true
 # default: 10
 whitelistCheckInterval: 10
 
+# Limit how many managed servers may be online concurrently. 0 = unlimited
+# default = 0
+maxOnlineServers: 0
+
+# Allow players with the permission "ptero.maxcap.bypass" to bypass the maxOnlineServers cap when starting servers.
+# default: true
+maxOnlineAllowBypass: true
+
+# Servers excluded from the above cap (by Velocity server name)
+maxOnlineExempt:
+  - hub
+  - lobby
+  - limbo
+
+# Whether to include lobbyBalancer lobbies in the maxOnlineServers count
+# default: false
+countLobbiesInMaxOnline: false
+
+# Whether to include lobbyBalancer limbos in the maxOnlineServers count
+# default: false
+countLimbosInMaxOnline: false
+
+# Servers that should always be kept online. The plugin will periodically check and start them if offline.
+alwaysOnline:
+  - limbo
+
+# How often to check/enforce the alwaysOnline list (in seconds)
+# default = 60
+alwaysOnlineCheckInterval: 60
+
+# Resource usage caching for panel queries
+# How long to cache resource usage responses (in seconds). Set to 0 to disable caching.
+# default = 10
+resourceCacheSeconds: 10
+
+# If enabled, the plugin will periodically prefetch resource usage for all managed servers
+# every 'resourceCacheSeconds' to keep the cache warm and make commands snappy.
+# default = true
+resourcePrefetchEnabled: true
+
+# Automatic idle shutdown sweep (failsafe)
+# Periodically checks all managed servers and schedules idle shutdowns if they are empty.
+# This safeguards against missed events or errors preventing scheduling.
+# Set to 0 or negative to disable.
+# default = 60
+idleShutdownCheckInterval: 60
+
+# In-memory player move history (server switch history)
+# Pretty display command: /ptero history [player]
+# Data is NOT saved to disk; only kept while the proxy is running
+moveHistory:
+  enabled: false
+  # Maximum number of recent moves to retain per player (latest first)
+  maxEntriesPerPlayer: 50
+
+# Lifecycle related behavior
+lifecycle:
+  # When the proxy shuts down, stop these servers.
+  # Use "all" to stop all managed servers, or provide a list of specific server names.
+  # This overrides 'alwaysOnline' during shutdown.
+  # Leave the list empty to disable stopping servers on proxy shutdown (default behavior).
+  # To stop all managed servers on shutdown, set:
+  #   shutdownOnProxyExit:
+  #     - all
+  # Or list specific servers by name.
+  shutdownOnProxyExit: []
+
+# Multi-lobby/limbo balancer settings
+lobbyBalancer:
+  # A list of lobby servers to use for player transfers and first-join routing (if you route players there).
+  # Order matters if lobbiesToUse is set; only the first N will be considered active.
+  lobbies:
+    - lobby
+    - hub
+
+  # Optional list of limbo servers to use while target servers are starting.
+  limbos:
+    - limbo
+
+  # How many lobbies from the list above should be considered for balancing (0 = use all listed)
+  # default = 0
+  lobbiesToUse: 0
+
+  # Balancer strategy: ROUND_ROBIN, LEAST_PLAYERS, or LEAST_CPU
+  # default = ROUND_ROBIN
+  strategy: "ROUND_ROBIN"
+
+  # Periodic health check interval in seconds for verifying reachability and planning scale-ups
+  # default = 15
+  healthCheckInterval: 15
+
+  # Keep at least this many lobby servers online (0 = no minimum)
+  # default = 1
+  minOnline: 1
+
+  # Do not keep more than this many lobby servers online (0 = unlimited)
+  # default = 0
+  maxOnline: 0
+
+  # Approximate players-per-lobby capacity used to decide when to scale up
+  # default = 80
+  playersPerServer: 80
+
+  # Only used with LEAST_CPU strategy. If any lobby exceeds this CPU percent, consider scaling up
+  # default = 85.0
+  cpuScaleUpThreshold: 85.0
+
+  # If true, balancer will auto-start additional lobbies when needed
+  # default = true
+  autoScaleEnabled: true
+
+  # Start another lobby before capacity is completely full.
+  # When total players across online lobbies reach this percent of capacity, VPP starts another lobby (if available).
+  # default = 80 (means start a new lobby at ~80% of total lobby capacity)
+  preStartThresholdPercent: 80
+
+  # If a lobby was started but doesn't come online within this many seconds, VPP will try starting a different lobby.
+  # default = 60
+  startFailureFallbackSeconds: 60
+
+  # After a failed start, wait this many seconds before trying that same lobby again.
+  # default = 120
+  startFailureCooldownSeconds: 120
+
+  # When a target server is starting, send players to a limbo (if available) and auto-queue them.
+  # If false, players will stay on their current server (or be disconnected if coming from proxy) while queued.
+  # default = false
+  sendToLimboOnStart: false
+
+  # Behavior for forced-host joins when the target backend is offline
+  # DISCONNECT       → disconnect (default)
+  # LOBBY_OR_LIMBO  → try a lobby first, then a limbo; if none, disconnect
+  # LIMBO_ONLY      → only try limbo; if none, disconnect
+  forcedHostOfflineBehavior: LOBBY_OR_LIMBO
+
 # Panel configuration
 pterodactyl:
   # The URL of your pterodactyl panel
@@ -106,7 +242,7 @@ pterodactyl:
   url: "https://panel.example.com"
   # The client api key of your panel.
   # The Plugin supports the Pterodactyl & Pelican System.
-  # Your API Key should either start with "ptlc_" or "peli_"
+  # Your API Key should start with "ptlc_" or "pacc" if you are using the Ptero or Peli Panel
   # You can find the client api key in the "API Credentials" tab of the "Account" page.
   apiKey: "ptlc_000000000000000000000000000000000000000000"
 
@@ -120,8 +256,9 @@ servers:
     # You can find the Panel server ID in the URL of the server page.
     # For example, if the URL is https://panel.example.com/server/1234abcd, the server ID is 1234abcd.
     # For Pelican, you need the short UUID from Server Details.
+    # IMPORTANT: Always quote the ID to prevent YAML from parsing it as a number (e.g., 91e62747 would become Infinity if unquoted)
 
-    id: 1234abcd
+    id: "1234abcd"
 
     # The time in seconds to stop the server after the last player leaves.
     # If you don't want to stop the server automatically, set it to -1.

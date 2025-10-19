@@ -34,6 +34,222 @@ public class PterodactylAPIClient extends AbstractPanelAPIClient {
         super(plugin);
     }
 
+    @Override
+    public java.util.concurrent.CompletableFuture<de.tubyoub.velocitypteropower.model.ServerResourceUsage> fetchServerResources(String serverId) {
+        return fetchWithCache(serverId, () -> {
+            if (serverId == null || serverId.isBlank()) {
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+            if (!rateLimitTracker.canMakeRequest()) {
+                logger.warn("Rate limit reached. Skipping resources fetch for {}.", serverId);
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+            try {
+                logger.debug("Fetching Pterodactyl resources for {} (cache ttl={}s)", serverId, configurationManager.getResourceCacheSeconds());
+
+                // 1) Fetch server details for max limits: memory (MiB), disk (MiB), cpu (%)
+                long limitFromDetailsBytes = -1L; // memory: -1 unknown; 0 unlimited
+                long diskLimitFromDetailsBytes = -1L; // disk: -1 unknown; 0 unlimited
+                double cpuLimitFromDetailsPercent = -1.0; // cpu: -1 unknown; 0 unlimited
+                try {
+                    java.net.http.HttpRequest detailsReq = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(configurationManager.getPterodactylUrl() + "api/client/servers/" + serverId))
+                        .header("Accept", "application/json")
+                        .header("Content-Type", "application/json")
+                        .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
+                        .GET()
+                        .timeout(java.time.Duration.ofSeconds(10))
+                        .build();
+                    java.net.http.HttpResponse<String> detailsResp = httpClient.send(detailsReq, java.net.http.HttpResponse.BodyHandlers.ofString());
+                    rateLimitTracker.updateRateLimitInfo(detailsResp);
+                    if (detailsResp.statusCode() == 200 && detailsResp.body() != null) {
+                        String detailsJson = detailsResp.body();
+                        long memMiB = extractLimitsMemoryMiB(detailsJson);
+                        if (memMiB >= 0) {
+                            limitFromDetailsBytes = memMiB * 1024L * 1024L; // 0 => unlimited
+                        }
+                        long diskMiB = extractLimitsDiskMiB(detailsJson);
+                        if (diskMiB >= 0) {
+                            diskLimitFromDetailsBytes = diskMiB * 1024L * 1024L; // 0 => unlimited
+                        }
+                        double cpuPct = extractLimitsCpuPercent(detailsJson);
+                        if (cpuPct >= 0) {
+                            cpuLimitFromDetailsPercent = cpuPct; // 0 => unlimited
+                        }
+                        logger.debug("Parsed server details for {} -> limits.memory={}MiB ({}B), limits.disk={}MiB ({}B), limits.cpu={}%%",
+                                serverId, memMiB, limitFromDetailsBytes, diskMiB, diskLimitFromDetailsBytes, cpuLimitFromDetailsPercent);
+                    } else {
+                        logger.debug("Server details fetch for {} returned status {}", serverId, detailsResp.statusCode());
+                    }
+                } catch (Exception e) {
+                    logger.debug("Failed to fetch/parse server details for {}: {}", serverId, e.toString());
+                }
+
+                // 2) Fetch live resources (usage + sometimes memory_limit_bytes)
+                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(configurationManager.getPterodactylUrl() + "api/client/servers/" + serverId + "/resources"))
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
+                    .GET()
+                    .timeout(java.time.Duration.ofSeconds(10))
+                    .build();
+
+                java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+                rateLimitTracker.updateRateLimitInfo(response);
+                if (response.statusCode() != 200 || response.body() == null) {
+                    logger.debug("Resources fetch for {} returned status {}", serverId, response.statusCode());
+                    return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+                }
+                String json = response.body();
+                // naive parsing without external JSON library
+                String state = extractString(json, "\"current_state\"");
+                boolean suspended = extractBoolean(json, "\"is_suspended\"");
+                long mem = extractLong(json, "\"memory_bytes\"");
+                long memLimitFromResources = extractLong(json, "\"memory_limit_bytes\"");
+                double cpu = extractDouble(json, "\"cpu_absolute\"");
+                long disk = extractLong(json, "\"disk_bytes\"");
+                long rx = extractLong(json, "\"network_rx_bytes\"");
+                long tx = extractLong(json, "\"network_tx_bytes\"");
+                long uptime = extractLong(json, "\"uptime\"");
+
+                long chosenLimit;
+                if (memLimitFromResources > 0) {
+                    chosenLimit = memLimitFromResources;
+                } else if (limitFromDetailsBytes >= 0) {
+                    // Use details-derived limit when resources missing/zero
+                    chosenLimit = limitFromDetailsBytes; // may be 0 (unlimited) or >0
+                } else {
+                    chosenLimit = 0L; // unknown -> treat as unlimited for consistency
+                }
+
+                logger.debug("Parsed resources for {} -> state={}, suspended={}, mem={}B/{}B (resources:{} details:{}), cpu={}%, disk={}B, rx={}B, tx={}B, uptime={}ms",
+                        serverId, state, suspended, mem, chosenLimit, memLimitFromResources, limitFromDetailsBytes, cpu, disk, rx, tx, uptime);
+
+                return new de.tubyoub.velocitypteropower.model.ServerResourceUsage(
+                    state != null ? state : "unknown",
+                    suspended,
+                    mem,
+                    chosenLimit,
+                    cpu,
+                    cpuLimitFromDetailsPercent,
+                    disk,
+                    diskLimitFromDetailsBytes,
+                    rx,
+                    tx,
+                    uptime,
+                    true
+                );
+            } catch (Exception e) {
+                logger.error("Error fetching resources for {}: {}", serverId, e.toString());
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+        });
+    }
+
+    private long extractLimitsMemoryMiB(String json) {
+        try {
+            int limitsIdx = json.indexOf("\"limits\"");
+            int searchStart = limitsIdx >= 0 ? limitsIdx : 0;
+            int memIdx = json.indexOf("\"memory\"", searchStart);
+            if (memIdx == -1) return -1L;
+            int colon = json.indexOf(':', memIdx);
+            if (colon == -1) return -1L;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9-]", "").trim();
+            if (val.isEmpty()) return -1L;
+            return Long.parseLong(val);
+        } catch (Exception e) {
+            return -1L;
+        }
+    }
+
+    private long extractLimitsDiskMiB(String json) {
+        try {
+            int limitsIdx = json.indexOf("\"limits\"");
+            int searchStart = limitsIdx >= 0 ? limitsIdx : 0;
+            int diskIdx = json.indexOf("\"disk\"", searchStart);
+            if (diskIdx == -1) return -1L;
+            int colon = json.indexOf(':', diskIdx);
+            if (colon == -1) return -1L;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9-]", "").trim();
+            if (val.isEmpty()) return -1L;
+            return Long.parseLong(val);
+        } catch (Exception e) {
+            return -1L;
+        }
+    }
+
+    private double extractLimitsCpuPercent(String json) {
+        try {
+            int limitsIdx = json.indexOf("\"limits\"");
+            int searchStart = limitsIdx >= 0 ? limitsIdx : 0;
+            int cpuIdx = json.indexOf("\"cpu\"", searchStart);
+            if (cpuIdx == -1) return -1.0;
+            int colon = json.indexOf(':', cpuIdx);
+            if (colon == -1) return -1.0;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9.-]", "").trim();
+            if (val.isEmpty()) return -1.0;
+            return Double.parseDouble(val);
+        } catch (Exception e) {
+            return -1.0;
+        }
+    }
+
+    private String extractString(String json, String key) {
+        int idx = json.indexOf(key);
+        if (idx == -1) return null;
+        int colon = json.indexOf(':', idx);
+        if (colon == -1) return null;
+        int firstQuote = json.indexOf('"', colon + 1);
+        if (firstQuote == -1) return null;
+        int secondQuote = json.indexOf('"', firstQuote + 1);
+        if (secondQuote == -1) return null;
+        return json.substring(firstQuote + 1, secondQuote);
+    }
+
+    private boolean extractBoolean(String json, String key) {
+        int idx = json.indexOf(key);
+        if (idx == -1) return false;
+        int colon = json.indexOf(':', idx);
+        if (colon == -1) return false;
+        int end = json.indexOf(',', colon + 1);
+        String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).trim();
+        return val.startsWith("true");
+    }
+
+    private long extractLong(String json, String key) {
+        try {
+            int idx = json.indexOf(key);
+            if (idx == -1) return 0L;
+            int colon = json.indexOf(':', idx);
+            if (colon == -1) return 0L;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9]", "").trim();
+            if (val.isEmpty()) return 0L;
+            return Long.parseLong(val);
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    private double extractDouble(String json, String key) {
+        try {
+            int idx = json.indexOf(key);
+            if (idx == -1) return 0.0;
+            int colon = json.indexOf(':', idx);
+            if (colon == -1) return 0.0;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9.\\-]", "").trim();
+            if (val.isEmpty()) return 0.0;
+            return Double.parseDouble(val);
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
     /**
      * Sends a power signal to a Pterodactyl server.
      *

@@ -15,6 +15,18 @@ import java.util.concurrent.*;
 
 public abstract class AbstractPanelAPIClient implements PanelAPIClient {
 
+    protected static class CacheEntry {
+        final long timestamp;
+        final de.tubyoub.velocitypteropower.model.ServerResourceUsage data;
+        CacheEntry(long timestamp, de.tubyoub.velocitypteropower.model.ServerResourceUsage data) {
+            this.timestamp = timestamp;
+            this.data = data;
+        }
+    }
+
+    // per-server resource usage cache
+    protected final java.util.concurrent.ConcurrentHashMap<String, CacheEntry> resourceCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     protected final Logger logger;
     protected final ConfigurationManager configurationManager;
     protected final ProxyServer proxyServer;
@@ -36,7 +48,15 @@ public abstract class AbstractPanelAPIClient implements PanelAPIClient {
         this.proxyServer = plugin.getProxyServer();
         this.rateLimitTracker = plugin.getRateLimitTracker();
 
-        this.executorService = Executors.newFixedThreadPool(configurationManager.getApiThreads());
+        int configuredThreads = configurationManager.getApiThreads();
+        int servers = 0;
+        try {
+            java.util.Map<String, de.tubyoub.velocitypteropower.model.PteroServerInfo> map = plugin.getServerInfoMap();
+            if (map != null) servers = map.size();
+        } catch (Exception ignored) {}
+        int computedThreads = Math.max(configuredThreads, Math.max(4, Math.min(64, servers * 2)));
+        this.executorService = java.util.concurrent.Executors.newFixedThreadPool(computedThreads);
+        logger.info("API executor threads: configured={}, servers={}, using={}", configuredThreads, servers, computedThreads);
         this.httpClient = HttpClient.newBuilder()
                 .executor(executorService)
                 .connectTimeout(Duration.ofSeconds(10))
@@ -160,5 +180,45 @@ public abstract class AbstractPanelAPIClient implements PanelAPIClient {
      */
     public void shutdown() {
         executorService.shutdownNow();
+    }
+
+    /**
+     * Helper to fetch resource usage with per-server caching.
+     */
+    protected java.util.concurrent.CompletableFuture<de.tubyoub.velocitypteropower.model.ServerResourceUsage> fetchWithCache(
+            String serverId,
+            java.util.function.Supplier<de.tubyoub.velocitypteropower.model.ServerResourceUsage> supplier
+    ) {
+        int ttl = configurationManager.getResourceCacheSeconds();
+        long now = System.currentTimeMillis();
+        if (ttl > 0) {
+            CacheEntry e = resourceCache.get(serverId);
+            if (e != null) {
+                long age = now - e.timestamp;
+                if (age < ttl * 1000L) {
+                    logger.debug("Resource cache HIT for {} (age={}ms, ttl={}s).", serverId, age, ttl);
+                    return java.util.concurrent.CompletableFuture.completedFuture(e.data);
+                } else {
+                    logger.debug("Resource cache EXPIRED for {} (age={}ms > ttl={}s).", serverId, age, ttl);
+                }
+            } else {
+                logger.debug("Resource cache MISS for {} (ttl={}s).", serverId, ttl);
+            }
+        } else {
+            logger.debug("Resource cache DISABLED (ttl=0) for {}.", serverId);
+        }
+        return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try {
+                de.tubyoub.velocitypteropower.model.ServerResourceUsage data = supplier.get();
+                if (ttl > 0 && data != null) {
+                    resourceCache.put(serverId, new CacheEntry(System.currentTimeMillis(), data));
+                    logger.debug("Resource cache STORE for {} (ttl={}s).", serverId, ttl);
+                }
+                return data == null ? de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable() : data;
+            } catch (Exception ex) {
+                logger.error("Error fetching resources for {}: {}", serverId, ex.toString());
+                return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
+            }
+        }, executorService);
     }
 }
