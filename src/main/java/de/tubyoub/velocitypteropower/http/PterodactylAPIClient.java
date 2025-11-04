@@ -1,33 +1,31 @@
 /*
  * This file is part of VelocityPteroPower, licensed under the MIT License.
  */
-package de.tubyoub.velocitypteropower.api;
+package de.tubyoub.velocitypteropower.http;
 
-import com.velocitypowered.api.proxy.ProxyServer;
-import com.velocitypowered.api.proxy.server.RegisteredServer;
-import com.velocitypowered.api.proxy.server.ServerPing;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
-import de.tubyoub.velocitypteropower.util.FilteredComponentLogger;
-import de.tubyoub.velocitypteropower.util.RateLimitTracker;
-import net.kyori.adventure.text.Component;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.Optional;
 import java.util.concurrent.*;
 
-
 /**
- * Implementation of {@link PanelAPIClient} for interacting with the Pelican Panel API.
- * NOTE: The current implementation is the same as the PterodactylAPIClient.
- * if Pelican changes the workings of their API, this class will be updated.
+ * Implementation of {@link PanelAPIClient} for interacting with the Pterodactyl Panel API.
  */
-public class PelicanAPIClient extends AbstractPanelAPIClient {
+public class PterodactylAPIClient extends AbstractPanelAPIClient {
+
+    /**
+     * Constructs a PterodactylAPIClient.
+     *
+     * @param plugin The main VelocityPteroPower plugin instance.
+     */
+    public PterodactylAPIClient(VelocityPteroPower plugin){
+        super(plugin);
+    }
 
     @Override
     public java.util.concurrent.CompletableFuture<de.tubyoub.velocitypteropower.model.ServerResourceUsage> fetchServerResources(String serverId) {
@@ -36,83 +34,161 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
                 return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
             }
             if (!rateLimitTracker.canMakeRequest()) {
-                logger.warn("Rate limit reached. Skipping Pelican resources fetch for {}.", serverId);
+                logger.warn("Rate limit reached. Skipping resources fetch for {}.", serverId);
                 return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
             }
             try {
-                logger.debug("Fetching Pelican resources for {} (cache ttl={}s)", serverId, configurationManager.getResourceCacheSeconds());
-                // Fetch limits from server details
-                String base = configurationManager.getPterodactylUrl();
-                java.net.http.HttpRequest detailsReq = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(base + "api/client/servers/" + serverId))
-                    .header("Accept", "application/json")
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
-                    .GET()
-                    .timeout(java.time.Duration.ofSeconds(10))
-                    .build();
-                java.net.http.HttpResponse<String> detailsResp = httpClient.send(detailsReq, java.net.http.HttpResponse.BodyHandlers.ofString());
-                rateLimitTracker.updateRateLimitInfo(detailsResp);
-                long memLimitBytes = -1L;
-                long diskLimitBytes = -1L;
-                double cpuLimitPercent = -1.0;
-                if (detailsResp.statusCode() == 200 && detailsResp.body() != null) {
-                    String djson = detailsResp.body();
-                    long memMiB = extractLong(djson, "\"limits\"", "\"memory\"");
-                    if (memMiB >= 0) memLimitBytes = memMiB * 1024L * 1024L; // 0 unlimited
-                    long diskMiB = extractLong(djson, "\"limits\"", "\"disk\"");
-                    if (diskMiB >= 0) diskLimitBytes = diskMiB * 1024L * 1024L; // 0 unlimited
-                    double cpuPct = extractDouble(djson, "\"limits\"", "\"cpu\"");
-                    if (cpuPct >= 0) cpuLimitPercent = cpuPct; // 0 unlimited
+                logger.debug("Fetching Pterodactyl resources for {} (cache ttl={}s)", serverId, configurationManager.getResourceCacheSeconds());
+
+                // 1) Fetch server details for max limits: memory (MiB), disk (MiB), cpu (%)
+                long limitFromDetailsBytes = -1L; // memory: -1 unknown; 0 unlimited
+                long diskLimitFromDetailsBytes = -1L; // disk: -1 unknown; 0 unlimited
+                double cpuLimitFromDetailsPercent = -1.0; // cpu: -1 unknown; 0 unlimited
+                try {
+                    java.net.http.HttpRequest detailsReq = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(configurationManager.getPterodactylUrl() + "api/client/servers/" + serverId))
+                        .header("Accept", "application/json")
+                        .header("Content-Type", "application/json")
+                        .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
+                        .GET()
+                        .timeout(java.time.Duration.ofSeconds(10))
+                        .build();
+                    java.net.http.HttpResponse<String> detailsResp = httpClient.send(detailsReq, java.net.http.HttpResponse.BodyHandlers.ofString());
+                    rateLimitTracker.updateRateLimitInfo(detailsResp);
+                    if (detailsResp.statusCode() == 200 && detailsResp.body() != null) {
+                        String detailsJson = detailsResp.body();
+                        long memMiB = extractLimitsMemoryMiB(detailsJson);
+                        if (memMiB >= 0) {
+                            limitFromDetailsBytes = memMiB * 1024L * 1024L; // 0 => unlimited
+                        }
+                        long diskMiB = extractLimitsDiskMiB(detailsJson);
+                        if (diskMiB >= 0) {
+                            diskLimitFromDetailsBytes = diskMiB * 1024L * 1024L; // 0 => unlimited
+                        }
+                        double cpuPct = extractLimitsCpuPercent(detailsJson);
+                        if (cpuPct >= 0) {
+                            cpuLimitFromDetailsPercent = cpuPct; // 0 => unlimited
+                        }
+                        logger.debug("Parsed server details for {} -> limits.memory={}MiB ({}B), limits.disk={}MiB ({}B), limits.cpu={}%%",
+                                serverId, memMiB, limitFromDetailsBytes, diskMiB, diskLimitFromDetailsBytes, cpuLimitFromDetailsPercent);
+                    } else {
+                        logger.debug("Server details fetch for {} returned status {}", serverId, detailsResp.statusCode());
+                    }
+                } catch (Exception e) {
+                    logger.debug("Failed to fetch/parse server details for {}: {}", serverId, e.toString());
                 }
 
-                // Fetch live resources
-                java.net.http.HttpRequest resReq = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(base + "api/client/servers/" + serverId + "/resources"))
+                // 2) Fetch live resources (usage + sometimes memory_limit_bytes)
+                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(configurationManager.getPterodactylUrl() + "api/client/servers/" + serverId + "/resources"))
                     .header("Accept", "application/json")
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
                     .GET()
                     .timeout(java.time.Duration.ofSeconds(10))
                     .build();
-                java.net.http.HttpResponse<String> resResp = httpClient.send(resReq, java.net.http.HttpResponse.BodyHandlers.ofString());
-                rateLimitTracker.updateRateLimitInfo(resResp);
-                if (resResp.statusCode() != 200 || resResp.body() == null) {
-                    logger.debug("Pelican resources fetch for {} returned status {}", serverId, resResp.statusCode());
+
+                java.net.http.HttpResponse<String> response = httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+                rateLimitTracker.updateRateLimitInfo(response);
+                if (response.statusCode() != 200 || response.body() == null) {
+                    logger.debug("Resources fetch for {} returned status {}", serverId, response.statusCode());
                     return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
                 }
-                String json = resResp.body();
+                String json = response.body();
+                // naive parsing without external JSON library
                 String state = extractString(json, "\"current_state\"");
                 boolean suspended = extractBoolean(json, "\"is_suspended\"");
-                long mem = extractLongFlat(json, "\"memory_bytes\"");
-                double cpu = extractDoubleFlat(json, "\"cpu_absolute\"");
-                long disk = extractLongFlat(json, "\"disk_bytes\"");
-                long rx = extractLongFlat(json, "\"network_rx_bytes\"");
-                long tx = extractLongFlat(json, "\"network_tx_bytes\"");
-                long uptime = extractLongFlat(json, "\"uptime\"");
+                long mem = extractLong(json, "\"memory_bytes\"");
+                long memLimitFromResources = extractLong(json, "\"memory_limit_bytes\"");
+                double cpu = extractDouble(json, "\"cpu_absolute\"");
+                long disk = extractLong(json, "\"disk_bytes\"");
+                long rx = extractLong(json, "\"network_rx_bytes\"");
+                long tx = extractLong(json, "\"network_tx_bytes\"");
+                long uptime = extractLong(json, "\"uptime\"");
 
-                logger.debug("Parsed Pelican resources for {} -> state={}, suspended={}, mem={}B/{}B, cpu={}%, disk={}B, rx={}B, tx={}B, uptime={}ms",
-                        serverId, state, suspended, mem, memLimitBytes, cpu, disk, rx, tx, uptime);
+                long chosenLimit;
+                if (memLimitFromResources > 0) {
+                    chosenLimit = memLimitFromResources;
+                } else if (limitFromDetailsBytes >= 0) {
+                    // Use details-derived limit when resources missing/zero
+                    chosenLimit = limitFromDetailsBytes; // may be 0 (unlimited) or >0
+                } else {
+                    chosenLimit = 0L; // unknown -> treat as unlimited for consistency
+                }
+
+                logger.debug("Parsed resources for {} -> state={}, suspended={}, mem={}B/{}B (resources:{} details:{}), cpu={}%, disk={}B, rx={}B, tx={}B, uptime={}ms",
+                        serverId, state, suspended, mem, chosenLimit, memLimitFromResources, limitFromDetailsBytes, cpu, disk, rx, tx, uptime);
 
                 return new de.tubyoub.velocitypteropower.model.ServerResourceUsage(
                     state != null ? state : "unknown",
                     suspended,
                     mem,
-                    memLimitBytes,
+                    chosenLimit,
                     cpu,
-                    cpuLimitPercent,
+                    cpuLimitFromDetailsPercent,
                     disk,
-                    diskLimitBytes,
+                    diskLimitFromDetailsBytes,
                     rx,
                     tx,
                     uptime,
                     true
                 );
             } catch (Exception e) {
-                logger.error("Error fetching Pelican resources for {}: {}", serverId, e.toString());
+                logger.error("Error fetching resources for {}: {}", serverId, e.toString());
                 return de.tubyoub.velocitypteropower.model.ServerResourceUsage.unavailable();
             }
         });
+    }
+
+    private long extractLimitsMemoryMiB(String json) {
+        try {
+            int limitsIdx = json.indexOf("\"limits\"");
+            int searchStart = limitsIdx >= 0 ? limitsIdx : 0;
+            int memIdx = json.indexOf("\"memory\"", searchStart);
+            if (memIdx == -1) return -1L;
+            int colon = json.indexOf(':', memIdx);
+            if (colon == -1) return -1L;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9-]", "").trim();
+            if (val.isEmpty()) return -1L;
+            return Long.parseLong(val);
+        } catch (Exception e) {
+            return -1L;
+        }
+    }
+
+    private long extractLimitsDiskMiB(String json) {
+        try {
+            int limitsIdx = json.indexOf("\"limits\"");
+            int searchStart = limitsIdx >= 0 ? limitsIdx : 0;
+            int diskIdx = json.indexOf("\"disk\"", searchStart);
+            if (diskIdx == -1) return -1L;
+            int colon = json.indexOf(':', diskIdx);
+            if (colon == -1) return -1L;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9-]", "").trim();
+            if (val.isEmpty()) return -1L;
+            return Long.parseLong(val);
+        } catch (Exception e) {
+            return -1L;
+        }
+    }
+
+    private double extractLimitsCpuPercent(String json) {
+        try {
+            int limitsIdx = json.indexOf("\"limits\"");
+            int searchStart = limitsIdx >= 0 ? limitsIdx : 0;
+            int cpuIdx = json.indexOf("\"cpu\"", searchStart);
+            if (cpuIdx == -1) return -1.0;
+            int colon = json.indexOf(':', cpuIdx);
+            if (colon == -1) return -1.0;
+            int end = json.indexOf(',', colon + 1);
+            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9.-]", "").trim();
+            if (val.isEmpty()) return -1.0;
+            return Double.parseDouble(val);
+        } catch (Exception e) {
+            return -1.0;
+        }
     }
 
     private String extractString(String json, String key) {
@@ -137,7 +213,7 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
         return val.startsWith("true");
     }
 
-    private long extractLongFlat(String json, String key) {
+    private long extractLong(String json, String key) {
         try {
             int idx = json.indexOf(key);
             if (idx == -1) return 0L;
@@ -152,7 +228,7 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
         }
     }
 
-    private double extractDoubleFlat(String json, String key) {
+    private double extractDouble(String json, String key) {
         try {
             int idx = json.indexOf(key);
             if (idx == -1) return 0.0;
@@ -167,53 +243,10 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
         }
     }
 
-    private long extractLong(String json, String parentKey, String childKey) {
-        try {
-            int p = json.indexOf(parentKey);
-            if (p == -1) return 0L;
-            int c = json.indexOf(childKey, p);
-            if (c == -1) return 0L;
-            int colon = json.indexOf(':', c);
-            if (colon == -1) return 0L;
-            int end = json.indexOf(',', colon + 1);
-            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9]", "").trim();
-            if (val.isEmpty()) return 0L;
-            return Long.parseLong(val);
-        } catch (Exception e) {
-            return 0L;
-        }
-    }
-
-    private double extractDouble(String json, String parentKey, String childKey) {
-        try {
-            int p = json.indexOf(parentKey);
-            if (p == -1) return 0.0;
-            int c = json.indexOf(childKey, p);
-            if (c == -1) return 0.0;
-            int colon = json.indexOf(':', c);
-            if (colon == -1) return 0.0;
-            int end = json.indexOf(',', colon + 1);
-            String val = (end == -1 ? json.substring(colon + 1) : json.substring(colon + 1, end)).replaceAll("[^0-9.\\-]", "").trim();
-            if (val.isEmpty()) return 0.0;
-            return Double.parseDouble(val);
-        } catch (Exception e) {
-            return 0.0;
-        }
-    }
-
     /**
-     * Constructs a PelicanAPIClient.
+     * Sends a power signal to a Pterodactyl server.
      *
-     * @param plugin The main VelocityPteroPower plugin instance.
-     */
-    public PelicanAPIClient(VelocityPteroPower plugin) {
-        super(plugin);
-    }
-
-    /**
-     * Sends a power signal to a Pelican server.
-     *
-     * @param serverId The Pelican server identifier (UUID).
+     * @param serverId The Pterodactyl server identifier (UUID).
      * @param signal   The power action (START, STOP, RESTART, KILL).
      */
     @Override
@@ -241,6 +274,7 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
         }
     }
 
+
     /**
      * Checks if a server is online using the configured method (Velocity Ping or Pterodactyl API).
      *
@@ -259,7 +293,7 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
             case PANEL_API:
                 return checkOnlineViaPanelApi(serverName, serverId);
             default:
-                // Should not happen with enum, but just in case
+               // Should not happen with enum, but just in case
                 logger.error(
                     "Unknown ServerCheckMethod: {}. Defaulting to false.",
                     method
@@ -269,11 +303,11 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
     }
 
     /**
-     * Checks server status by querying the Pelican API /resources endpoint.
+     * Checks server status by querying the Pterodactyl API /resources endpoint.
      * Includes retry logic for specific HTTP/2 GOAWAY errors.
      *
      * @param serverName The name of the server (for logging).
-     * @param serverId   The Pelican server identifier (UUID).
+     * @param serverId   The Pterodactyl server identifier (UUID).
      * @return True if the API reports the server state as "running", false otherwise.
      */
     protected boolean checkOnlineViaPanelApi(String serverName, String serverId) {
@@ -413,44 +447,44 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
     }
 
     public CompletableFuture<String> fetchWhitelistFile(String serverId) {
-    CompletableFuture<String> future = new CompletableFuture<>();
+        CompletableFuture<String> future = new CompletableFuture<>();
+        logger.debug("Fetching whitelist for server {} with ID {}", serverId, serverId);
+        executorService.submit(() -> {
+            try {
+                String url = configurationManager.getPterodactylUrl() + "api/client/servers/" + serverId + "/files/contents?file=whitelist.json";
 
-    executorService.submit(() -> {
-        try {
-            String url = configurationManager.getPterodactylUrl() + "api/client/servers/" + serverId + "/files/contents?file=whitelist.json";
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
+                    .GET()
+                    .build();
 
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + configurationManager.getPterodactylApiKey())
-                .GET()
-                .build();
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                // Update rate limit tracker
+                rateLimitTracker.updateRateLimitInfo(response);
 
-            // Update rate limit tracker
-            rateLimitTracker.updateRateLimitInfo(response);
-
-            if (response.statusCode() == 200) {
-                future.complete(response.body());
-            } else if (response.statusCode() == 404) {
-                logger.debug("Whitelist file not found for server {}", serverId);
-                future.complete("[]"); // Return empty whitelist if file doesn't exist
-            } else {
-                logger.error("Failed to fetch whitelist for server {}: HTTP {}", serverId, response.statusCode());
-                future.completeExceptionally(new RuntimeException("HTTP Error " + response.statusCode()));
+                if (response.statusCode() == 200) {
+                    future.complete(response.body());
+                } else if (response.statusCode() == 404) {
+                    logger.debug("Whitelist file not found for server {}", serverId);
+                    future.complete("[]"); // Return empty whitelist if file doesn't exist
+                } else {
+                    logger.error("Failed to fetch whitelist for server {}: HTTP {}", serverId, response.statusCode());
+                    future.completeExceptionally(new RuntimeException("HTTP Error " + response.statusCode()));
+                }
+            } catch (Exception e) {
+                logger.error("Error fetching whitelist for server {}: {}", serverId, e.getMessage());
+                future.completeExceptionally(e);
             }
-        } catch (Exception e) {
-            logger.error("Error fetching whitelist for server {}: {}", serverId, e.getMessage());
-            future.completeExceptionally(e);
-        }
-    });
-
-    return future;
-}
+        });
+        logger.debug(future.toString());
+        return future;
+    }
     public boolean isApiKeyValid(String apiKey) {
-        if (!rateLimitTracker.canMakeRequest()) {
+            if (!rateLimitTracker.canMakeRequest()) {
             logger.warn("Rate limit reached. Cannot check if ApiKey is valid}.");
             return false;
         }
@@ -475,5 +509,4 @@ public class PelicanAPIClient extends AbstractPanelAPIClient {
         }
         return false;
     }
-
 }

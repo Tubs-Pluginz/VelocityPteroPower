@@ -8,7 +8,7 @@ import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
-import de.tubyoub.velocitypteropower.api.*;
+import de.tubyoub.velocitypteropower.http.*;
 import de.tubyoub.velocitypteropower.command.PteroCommand;
 import de.tubyoub.velocitypteropower.handler.PlayerConnectionHandler;
 import de.tubyoub.velocitypteropower.lifecycle.ServerLifecycleManager;

@@ -1,4 +1,4 @@
-package de.tubyoub.velocitypteropower.api;
+package de.tubyoub.velocitypteropower.http;
 
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;

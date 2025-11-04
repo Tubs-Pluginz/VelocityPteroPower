@@ -5,7 +5,7 @@ package de.tubyoub.velocitypteropower.manager;
 
 import de.tubyoub.velocitypteropower.model.PteroServerInfo;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
-import de.tubyoub.velocitypteropower.api.PanelType;
+import de.tubyoub.velocitypteropower.http.PanelType;
 import dev.dejvokep.boostedyaml.YamlDocument;
 import dev.dejvokep.boostedyaml.block.implementation.Section;
 import dev.dejvokep.boostedyaml.dvs.versioning.BasicVersioning;

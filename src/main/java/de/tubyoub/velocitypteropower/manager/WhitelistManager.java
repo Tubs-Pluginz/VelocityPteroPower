@@ -7,16 +7,13 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
-import de.tubyoub.velocitypteropower.api.PanelAPIClient;
-import de.tubyoub.velocitypteropower.api.PanelType;
-import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
+import de.tubyoub.velocitypteropower.http.PanelAPIClient;
+import de.tubyoub.velocitypteropower.http.PanelType;
 import de.tubyoub.velocitypteropower.model.PteroServerInfo;
 import org.slf4j.Logger;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 

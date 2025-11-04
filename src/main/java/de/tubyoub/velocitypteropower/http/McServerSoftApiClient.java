@@ -1,22 +1,15 @@
-package de.tubyoub.velocitypteropower.api;
+package de.tubyoub.velocitypteropower.http;
 
-import com.velocitypowered.api.proxy.ProxyServer;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
 
-import java.awt.*;
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
-import de.tubyoub.velocitypteropower.util.RateLimitTracker;
-import org.slf4j.Logger;
 
 public class McServerSoftApiClient extends AbstractPanelAPIClient {
 

@@ -3,7 +3,7 @@
  */
 package de.tubyoub.velocitypteropower.util;
 
-import de.tubyoub.velocitypteropower.api.PanelType;
+import de.tubyoub.velocitypteropower.http.PanelType;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 
