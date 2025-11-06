@@ -42,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
         description = "Manage Pterodactyl/Pelican/Mc Server Soft servers via Velocity.",
         url = "https://github.com/Tubs-Pluginz/VelocityPteroPower")
 public class VelocityPteroPower {
-    private static final String VERSION = "0.9.5";
+    private static final String VERSION = "0.9.6-alpha";
     private static final String MODRINTH_PROJECT_ID = "1dDr5J4w";
     private static final int BSTATS_PLUGIN_ID = 21465;
 
