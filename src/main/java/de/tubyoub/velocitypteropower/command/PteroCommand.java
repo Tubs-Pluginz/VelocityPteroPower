@@ -154,7 +154,25 @@ public class PteroCommand implements SimpleCommand {
                 }
                 break;
 
+            case "api":
+                if (sender.hasPermission("ptero.info")) {
+                    showApiInfo(sender);
+                } else {
+                    sender.sendMessage(messages.prefixed(MessageKey.COMMAND_NO_PERMISSION));
+                }
+                break;
+
             default:
+                // Delegate to registered addon subcommands via public API
+                de.tubyoub.vpp.api.VPPApi api = de.tubyoub.vpp.api.VPPApiProvider.get();
+                if (api != null) {
+                    boolean handled = false;
+                    try {
+                        handled = api.dispatchSubcommand(sub, new de.tubyoub.velocitypteropower.api.VelocityCommandActor(sender),
+                                java.util.Arrays.copyOfRange(args, 1, args.length));
+                    } catch (Throwable ignored) {}
+                    if (handled) return;
+                }
                 sender.sendMessage(
                         messages.prefixed(
                                 MessageKey.COMMAND_UNKNOWN_SUBCOMMAND, "sub", sub));
@@ -823,19 +841,36 @@ public class PteroCommand implements SimpleCommand {
             if (sender.hasPermission("ptero.list")) subs.add("list");
             if (sender.hasPermission("ptero.info")) subs.add("info");
             if (sender.hasPermission("ptero.info")) subs.add("apithreads");
+            if (sender.hasPermission("ptero.info")) subs.add("api");
             if (sender.hasPermission("ptero.history")) subs.add("history");
             if (sender.hasPermission("ptero.stopIdle")) subs.add("stopidle");
             if (sender.hasPermission("ptero.whitelistReload")) subs.add("whitelistReload");
             if (sender.hasPermission("ptero.reload")) subs.add("reload");
             if (sender.hasPermission("ptero.forcestopall")) subs.add("forcestopall");
             if (sender.hasPermission("ptero.forcestartall")) subs.add("forcestartall");
+            // Include addon commands
+            try {
+                de.tubyoub.vpp.api.VPPApi api = de.tubyoub.vpp.api.VPPApiProvider.get();
+                if (api != null) {
+                    for (de.tubyoub.vpp.api.AddonCommand c : api.getRegisteredCommands()) {
+                        String perm = c.permission();
+                        if (perm == null || perm.isBlank() || sender.hasPermission(perm)) {
+                            if (c.name() != null && !c.name().isBlank()) subs.add(c.name());
+                            java.util.List<String> al = c.aliases();
+                            if (al != null) {
+                                for (String a : al) if (a != null && !a.isBlank()) subs.add(a);
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
 
             if (current.isEmpty()) return subs;
             final String prefix = current;
             return subs.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
         }
 
-        // Second argument suggestions (server names)
+        // Second argument suggestions (server names) or addon subcommands
         if (args.length == 2) {
             String sub = args[0].toLowerCase(Locale.ROOT);
             boolean needsServer = sub.equals("start") || sub.equals("stop") || sub.equals("restart") || sub.equals("info");
@@ -870,6 +905,37 @@ public class PteroCommand implements SimpleCommand {
             }
         }
 
+        // Addon subcommand suggestions for any depth
+        try {
+            de.tubyoub.vpp.api.VPPApi api = de.tubyoub.vpp.api.VPPApiProvider.get();
+            if (api != null && args.length >= 2) {
+                String sub = args[0].toLowerCase(java.util.Locale.ROOT);
+                for (de.tubyoub.vpp.api.AddonCommand c : api.getRegisteredCommands()) {
+                    boolean match = false;
+                    try {
+                        if (c.name() != null && c.name().equalsIgnoreCase(sub)) match = true;
+                        if (!match) {
+                            java.util.List<String> al = c.aliases();
+                            if (al != null) {
+                                for (String a : al) { if (a != null && a.equalsIgnoreCase(sub)) { match = true; break; } }
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+                    if (!match) continue;
+                    String perm = c.permission();
+                    if (perm != null && !perm.isBlank() && !sender.hasPermission(perm)) return java.util.Collections.emptyList();
+                    de.tubyoub.velocitypteropower.api.VelocityCommandActor actor = new de.tubyoub.velocitypteropower.api.VelocityCommandActor(sender);
+                    String[] subArgs = java.util.Arrays.copyOfRange(args, 1, args.length);
+                    java.util.List<String> sug = c.suggest(actor, subArgs);
+                    if (sug != null) {
+                        String prefix = args[args.length - 1];
+                        return sug.stream().filter(s -> s != null && s.toLowerCase(java.util.Locale.ROOT).startsWith(prefix.toLowerCase(java.util.Locale.ROOT))).collect(java.util.stream.Collectors.toList());
+                    }
+                    break;
+                }
+            }
+        } catch (Throwable ignored) {}
+
         return java.util.Collections.emptyList();
     }
 
@@ -881,12 +947,75 @@ public class PteroCommand implements SimpleCommand {
         sender.sendMessage(Component.text("/ptero list"));
         sender.sendMessage(Component.text("/ptero info <serverName>"));
         sender.sendMessage(Component.text("/ptero apithreads"));
+        sender.sendMessage(Component.text("/ptero api"));
         sender.sendMessage(Component.text("/ptero history [playerName|uuid]"));
         sender.sendMessage(Component.text("/ptero stopidle"));
         sender.sendMessage(Component.text("/ptero forcestopall"));
         sender.sendMessage(Component.text("/ptero forcestartall"));
         sender.sendMessage(Component.text("/ptero whitelistReload"));
         sender.sendMessage(Component.text("/ptero reload"));
+        // List registered addon commands
+        try {
+            de.tubyoub.vpp.api.VPPApi api = de.tubyoub.vpp.api.VPPApiProvider.get();
+            if (api != null) {
+                java.util.Collection<de.tubyoub.vpp.api.AddonCommand> cmds = api.getRegisteredCommands();
+                if (cmds != null && !cmds.isEmpty()) {
+                    sender.sendMessage(Component.text("/ptero <addon> ... (registered addons):"));
+                    for (de.tubyoub.vpp.api.AddonCommand c : cmds) {
+                        String perm = c.permission();
+                        if (perm == null || perm.isBlank() || sender.hasPermission(perm)) {
+                            String name = c.name(); if (name == null) name = "unknown";
+                            String desc = c.description(); if (desc == null) desc = "";
+                            sender.sendMessage(Component.text(" - " + name + " - " + desc));
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
         sender.sendMessage(Component.text("/ptero help"));
+    }
+
+    private void showApiInfo(CommandSource sender) {
+        try {
+            de.tubyoub.vpp.api.VPPApi api = de.tubyoub.vpp.api.VPPApiProvider.get();
+            if (api == null) {
+                sender.sendMessage(Component.text("[VPP] Public API not initialized."));
+                return;
+            }
+            String version = "unknown";
+            try { version = api.getApiVersion(); } catch (Throwable ignored) {}
+            java.util.Collection<de.tubyoub.vpp.api.AddonCommand> cmds = java.util.Collections.emptyList();
+            try { cmds = api.getRegisteredCommands(); } catch (Throwable ignored) {}
+            int count = cmds != null ? cmds.size() : 0;
+            boolean routing = false;
+            try { routing = api.hasRoutingProvider(); } catch (Throwable ignored) {}
+            boolean httpAvail = false;
+            try { httpAvail = api.getPanelHttp() != null; } catch (Throwable ignored) {}
+            boolean ctrlAvail = false;
+            try { ctrlAvail = api.getServerControl() != null; } catch (Throwable ignored) {}
+            boolean regAvail = false;
+            try { regAvail = api.getServerRegistry() != null; } catch (Throwable ignored) {}
+
+            sender.sendMessage(Component.text("VPP API version: " + version));
+            sender.sendMessage(Component.text("RoutingProvider registered: " + routing));
+            sender.sendMessage(Component.text("Addon commands registered: " + count));
+            if (count > 0) {
+                java.util.List<String> names = new java.util.ArrayList<>();
+                for (de.tubyoub.vpp.api.AddonCommand c : cmds) {
+                    if (c == null) continue;
+                    try {
+                        String n = c.name();
+                        if (n != null && !n.isBlank()) names.add(n);
+                    } catch (Throwable ignored) {}
+                }
+                java.util.Collections.sort(names, String.CASE_INSENSITIVE_ORDER);
+                sender.sendMessage(Component.text(" - " + String.join(", ", names)));
+            }
+            sender.sendMessage(Component.text("PanelHttpFacade available: " + httpAvail));
+            sender.sendMessage(Component.text("ServerControl available: " + ctrlAvail));
+            sender.sendMessage(Component.text("ServerRegistry available: " + regAvail));
+        } catch (Throwable t) {
+            sender.sendMessage(Component.text("Failed to read API info: " + t.getMessage()));
+        }
     }
 }

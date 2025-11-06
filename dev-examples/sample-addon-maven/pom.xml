@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.example</groupId>
+    <artifactId>vpp-addon-sample</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <name>VPP Addon Sample</name>
+    <description>Minimal example Velocity plugin that integrates with VelocityPteroPower's public API</description>
+    <packaging>jar</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.release>21</maven.compiler.release>
+        <velocity.api.version>3.4.0-SNAPSHOT</velocity.api.version>
+        <vpp.version>0.9.6</vpp.version>
+        <!-- Path to the locally built API jar (when building inside this repo) -->
+        <vpp.local.api.jar>${project.basedir}/../../target/VelocityPteroPower-${vpp.version}-api.jar</vpp.local.api.jar>
+    </properties>
+
+    <repositories>
+        <!-- Velocity API -->
+        <repository>
+            <id>papermc-repo</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!-- Velocity API at compile-time only -->
+        <dependency>
+            <groupId>com.velocitypowered</groupId>
+            <artifactId>velocity-api</artifactId>
+            <version>${velocity.api.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <!--
+      Dependency on the VPP API is handled via profiles:
+      - use-local-api-jar: activated when the local slim API jar exists under ../../../target
+      - use-installed-vpp-api: active by default, expects the API classifier to be present in ~/.m2 (run `mvn install` in the VPP root)
+    -->
+    <profiles>
+        <profile>
+            <id>use-local-api-jar</id>
+            <activation>
+                <file>
+                    <exists>${vpp.local.api.jar}</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>de.tubyoub</groupId>
+                    <artifactId>VelocityPteroPower</artifactId>
+                    <version>${vpp.version}</version>
+                    <scope>system</scope>
+                    <systemPath>${vpp.local.api.jar}</systemPath>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>use-installed-vpp-api</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>de.tubyoub</groupId>
+                    <artifactId>VelocityPteroPower</artifactId>
+                    <version>${vpp.version}</version>
+                    <classifier>api</classifier>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                    <release>${maven.compiler.release}</release>
+                    <!-- Enable Velocity's annotation processor to generate velocity-plugin.json -->
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.velocitypowered</groupId>
+                            <artifactId>velocity-api</artifactId>
+                            <version>${velocity.api.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

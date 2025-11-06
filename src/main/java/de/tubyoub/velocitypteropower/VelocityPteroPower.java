@@ -116,6 +116,15 @@ public class VelocityPteroPower {
             filteredLogger.error("Failed to initialize Panel API Client. Plugin disabled.");
             return;
         }
+        // Initialize public API and wrap client for eventing
+        var eventBus = new de.tubyoub.velocitypteropower.api.DefaultVPPEventBus();
+        var panelHttp = new de.tubyoub.velocitypteropower.api.PanelHttpFacadeImpl(configurationManager, ((de.tubyoub.velocitypteropower.http.AbstractPanelAPIClient) this.apiClient).getHttpClient());
+        var serverControl = new de.tubyoub.velocitypteropower.api.ServerControlImpl(this);
+        var serverRegistry = new de.tubyoub.velocitypteropower.api.ServerRegistryImpl(this);
+        var defaultApi = new de.tubyoub.velocitypteropower.api.DefaultVPPApi(eventBus, panelHttp, serverControl, serverRegistry, this.getDataDirectory());
+        de.tubyoub.vpp.api.VPPApiProvider.set(defaultApi);
+        // wrap api client to fire events
+        this.apiClient = new de.tubyoub.velocitypteropower.api.EventingPanelAPIClient(this, this.apiClient);
         if (!configurationManager.getPanelType().equals(PanelType.mcServerSoft)) {
             whitelistManager.initialize();
         } else {
@@ -125,9 +134,16 @@ public class VelocityPteroPower {
         this.serverLifecycleManager = new ServerLifecycleManager(proxyServer, this);
         this.playerConnectionHandler = new PlayerConnectionHandler(proxyServer, this);
         this.serverSwitchListener = new ServerSwitchListener(this, serverLifecycleManager);
-        // Initialize and start lobby/limbo balancer
-        this.lobbyBalancerManager = new LobbyBalancerManager(this);
-        this.lobbyBalancerManager.startSchedulers();
+        // Initialize and optionally start built-in lobby/limbo balancer (controlled solely by config)
+        boolean enableBuiltin = configurationManager.isBuiltinLobbyBalancerEnabled();
+        if (enableBuiltin) {
+            this.lobbyBalancerManager = new LobbyBalancerManager(this);
+            this.lobbyBalancerManager.startSchedulers();
+            filteredLogger.info("Built-in LobbyBalancerManager ENABLED (lobbyBalancer.enableBuiltin=true).");
+        } else {
+            this.lobbyBalancerManager = null;
+            filteredLogger.info("Built-in LobbyBalancerManager DISABLED by config (lobbyBalancer.enableBuiltin=false).");
+        }
         // Initialize limbo tracking service
         this.limboTrackerService = new de.tubyoub.velocitypteropower.service.LimboTrackerService(this);
         // Schedule a light periodic sweep to drop stale records
@@ -289,6 +305,7 @@ public class VelocityPteroPower {
             if (apiClient != null) {
                 apiClient.shutdown();
             }
+            try { de.tubyoub.vpp.api.VPPApiProvider.set(null); } catch (Throwable ignored) {}
             filteredLogger.info("Shutting down VelocityPteroPower... Goodbye!");
         }
     }
@@ -302,6 +319,25 @@ public class VelocityPteroPower {
         whitelistManager.initialize();
 
         this.serverInfoMap = configurationManager.getServerInfoMap();
+
+        // Re-evaluate built-in lobby balancer state based on config only
+        boolean enableBuiltin = configurationManager.isBuiltinLobbyBalancerEnabled();
+        if (enableBuiltin) {
+            if (this.lobbyBalancerManager == null) {
+                this.lobbyBalancerManager = new de.tubyoub.velocitypteropower.lobby.LobbyBalancerManager(this);
+                this.lobbyBalancerManager.startSchedulers();
+                filteredLogger.info("Built-in LobbyBalancerManager ENABLED after reload (lobbyBalancer.enableBuiltin=true).");
+            } else {
+                // Already present; ensure it is running
+                try { this.lobbyBalancerManager.startSchedulers(); } catch (Throwable ignored) {}
+            }
+        } else {
+            if (this.lobbyBalancerManager != null) {
+                try { this.lobbyBalancerManager.stopSchedulers(); } catch (Throwable ignored) {}
+                this.lobbyBalancerManager = null;
+                filteredLogger.info("Built-in LobbyBalancerManager DISABLED by config after reload (lobbyBalancer.enableBuiltin=false).");
+            }
+        }
 
         PanelType oldType =
                 (apiClient instanceof PelicanAPIClient)
@@ -319,6 +355,18 @@ public class VelocityPteroPower {
                 filteredLogger.error(
                         "Failed to re-initialize Panel API Client after reload. Plugin will not function correctly.");
             } else {
+                // Recreate public API wiring and eventing wrapper
+                try {
+                    var eventBus = new de.tubyoub.velocitypteropower.api.DefaultVPPEventBus();
+                    var panelHttp = new de.tubyoub.velocitypteropower.api.PanelHttpFacadeImpl(configurationManager, ((de.tubyoub.velocitypteropower.http.AbstractPanelAPIClient) this.apiClient).getHttpClient());
+                    var serverControl = new de.tubyoub.velocitypteropower.api.ServerControlImpl(this);
+                    var serverRegistry = new de.tubyoub.velocitypteropower.api.ServerRegistryImpl(this);
+                    var defaultApi = new de.tubyoub.velocitypteropower.api.DefaultVPPApi(eventBus, panelHttp, serverControl, serverRegistry, this.getDataDirectory());
+                    de.tubyoub.vpp.api.VPPApiProvider.set(defaultApi);
+                    this.apiClient = new de.tubyoub.velocitypteropower.api.EventingPanelAPIClient(this, this.apiClient);
+                } catch (Throwable t) {
+                    filteredLogger.warn("Failed to re-wire public API after reload: {}", t.toString());
+                }
                 filteredLogger.warn("API Client re-initialized. Dependent components use live references.");
             }
         } else {

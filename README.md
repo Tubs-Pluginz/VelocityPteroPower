@@ -33,6 +33,42 @@
     -   Customize logging levels.
     -   Per-server settings for timeouts, join delays, and whitelist enforcement.
 
+## Developer API (Maven/Gradle)
+If you're building an addon against VelocityPteroPower, depend on the slim public API artifact with classifier `api`.
+
+- Full instructions and options (JitPack, local build, GitHub Packages): see docs/api/consuming.md or the hosted docs at https://docs.pluginz.dev/
+- Quick examples:
+
+Maven:
+
+```xml
+<repositories>
+  <repository>
+    <id>jitpack.io</id>
+    <url>https://jitpack.io</url>
+  </repository>
+</repositories>
+
+<dependency>
+  <groupId>com.github.TubYoub</groupId>
+  <artifactId>VelocityPteroPower</artifactId>
+  <version>0.9.6</version>
+  <classifier>api</classifier>
+  <scope>provided</scope>
+</dependency>
+```
+
+Gradle (Kotlin DSL):
+
+```kotlin
+repositories { maven("https://jitpack.io") }
+dependencies { compileOnly("com.github.TubYoub:VelocityPteroPower:0.9.6:api") }
+```
+
+Use `provided`/`compileOnly` so your addon does not bundle the API at runtime.
+
+For API usage examples (commands, HTTP, events, routing), see the Developer API docs in docs/api/.
+
 ## Commands
 -   `/ptero start <serverName>`
 -   `/ptero stop <serverName>`
@@ -40,6 +76,7 @@
 -   `/ptero list`
 -   `/ptero info <serverName>`
 -   `/ptero apithreads`
+-   `/ptero api`
 -   `/ptero reload`
 -   `/ptero whitelistReload`
 -   `/ptero stopidle`

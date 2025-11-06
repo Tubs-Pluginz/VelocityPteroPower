@@ -169,6 +169,11 @@ lifecycle:
 
 # Multi-lobby/limbo balancer settings
 lobbyBalancer:
+  # Enable the built-in balancer logic provided by VPP. If you plan to use an external addon that registers a RoutingProvider,
+  # you can set this to false to disable the built-in balancer entirely. Routing providers do NOT automatically disable the
+  # built-in balancer; providers run first and VPP falls back to the built-in balancer if this is true.
+  enableBuiltin: true
+
   # A list of lobby servers to use for player transfers and first-join routing (if you route players there).
   # Order matters if lobbiesToUse is set; only the first N will be considered active.
   lobbies:

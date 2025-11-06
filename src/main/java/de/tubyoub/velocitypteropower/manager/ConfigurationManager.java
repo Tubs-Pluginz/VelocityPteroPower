@@ -96,6 +96,7 @@ public class ConfigurationManager {
     private int balancerStartFailureCooldownSeconds;
     private boolean sendToLimboOnStart;
     private ForcedHostOfflineBehavior forcedHostOfflineBehavior = ForcedHostOfflineBehavior.DISCONNECT;
+    private boolean builtinLobbyBalancerEnabled = true;
 
     private final VelocityPteroPower plugin;
     private final Logger logger;
@@ -214,6 +215,7 @@ public class ConfigurationManager {
                     forcedHostOfflineBehavior = ForcedHostOfflineBehavior.LOBBY_OR_LIMBO;
                     logger.warn("Invalid forcedHostOfflineBehavior '{}' in config. Defaulting to LOBBY_OR_LIMBO.", fho);
                 }
+                builtinLobbyBalancerEnabled = lb.getBoolean("enableBuiltin", true);
             } else {
                 // defaults
                 balancerLobbies = Collections.emptyList();
@@ -231,6 +233,7 @@ public class ConfigurationManager {
                 balancerStartFailureCooldownSeconds = 120;
                 sendToLimboOnStart = false;
                 forcedHostOfflineBehavior = ForcedHostOfflineBehavior.LOBBY_OR_LIMBO;
+                builtinLobbyBalancerEnabled = true;
             }
 
             // Migrate legacy 'limboServer' to 'lobbyBalancer.limbos'
@@ -396,6 +399,7 @@ public class ConfigurationManager {
     public int getBalancerStartFailureCooldownSeconds() { return balancerStartFailureCooldownSeconds <= 0 ? 120 : balancerStartFailureCooldownSeconds; }
     public boolean isSendToLimboOnStart() { return sendToLimboOnStart; }
     public ForcedHostOfflineBehavior getForcedHostOfflineBehavior() { return forcedHostOfflineBehavior; }
+    public boolean isBuiltinLobbyBalancerEnabled() { return builtinLobbyBalancerEnabled; }
 
     /**
      * This method returns the Pterodactyl URL.

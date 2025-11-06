@@ -37,6 +37,14 @@ public abstract class AbstractPanelAPIClient implements PanelAPIClient {
     protected final ExecutorService executorService;
 
     /**
+     * Exposes the internal HttpClient for API facade usage.
+     * Intended for read-only use by integration layers.
+     */
+    public HttpClient getHttpClient() {
+        return httpClient;
+    }
+
+    /**
      * Constructs a base API client with common dependencies.
      *
      * @param plugin The main VelocityPteroPower plugin instance.

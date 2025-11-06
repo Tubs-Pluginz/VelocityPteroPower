@@ -2,6 +2,7 @@ package de.tubyoub.velocitypteropower.lobby;
 
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
+import com.velocitypowered.api.scheduler.ScheduledTask;
 import de.tubyoub.velocitypteropower.VelocityPteroPower;
 import de.tubyoub.velocitypteropower.http.PanelAPIClient;
 import de.tubyoub.velocitypteropower.http.PowerSignal;
@@ -21,6 +22,9 @@ import java.util.Locale;
  * existing single-limbo setups continue to work.
  */
 public class LobbyBalancerManager {
+
+    private volatile boolean running = false;
+    private volatile ScheduledTask healthTask;
 
     public enum Strategy {
         ROUND_ROBIN,
@@ -82,19 +86,36 @@ public class LobbyBalancerManager {
 
     // region Scheduling
     public void startSchedulers() {
+        running = true;
         int interval = Math.max(5, config.getBalancerHealthCheckInterval());
-        proxy.getScheduler().buildTask(plugin, this::healthAndScaleTick)
+        // Cancel previous if any
+        if (healthTask != null) {
+            try { healthTask.cancel(); } catch (Exception ignored) {}
+            healthTask = null;
+        }
+        healthTask = proxy.getScheduler().buildTask(plugin, this::healthAndScaleTick)
                 .delay(interval, TimeUnit.SECONDS).schedule();
         logger.info("LobbyBalancer health-check scheduled every {}s.", interval);
     }
 
+    public void stopSchedulers() {
+        running = false;
+        if (healthTask != null) {
+            try { healthTask.cancel(); } catch (Exception ignored) {}
+            healthTask = null;
+        }
+        logger.info("LobbyBalancer health-check stopped.");
+    }
+
     private void reschedule() {
+        if (!running) return;
         int interval = Math.max(5, config.getBalancerHealthCheckInterval());
-        proxy.getScheduler().buildTask(plugin, this::healthAndScaleTick)
+        healthTask = proxy.getScheduler().buildTask(plugin, this::healthAndScaleTick)
                 .delay(interval, TimeUnit.SECONDS).schedule();
     }
 
     private void healthAndScaleTick() {
+        if (!running) return;
         try {
             cleanupCooldowns();
             fallbackCheckAndStartAlternate();

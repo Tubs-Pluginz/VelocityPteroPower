@@ -18,6 +18,10 @@ import de.tubyoub.velocitypteropower.util.RateLimitTracker;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import de.tubyoub.vpp.api.VPPApiProvider;
+import de.tubyoub.vpp.api.event.PlayerPreConnectEvent;
+import de.tubyoub.vpp.api.event.PlayerPreServerSwitchEvent;
+import de.tubyoub.vpp.api.routing.PlayerRouteContext;
 
 import java.util.Map;
 import java.util.Optional;
@@ -60,6 +64,63 @@ public class PlayerConnectionHandler {
     Player player = event.getPlayer();
     RegisteredServer targetServer = event.getOriginalServer();
     String serverName = targetServer.getServerInfo().getName();
+
+    // Public API: allow addons to intercept and reroute/cancel before any internal logic
+    try {
+      var api = VPPApiProvider.get();
+      if (api != null) {
+        RegisteredServer prevServer = event.getPreviousServer();
+        String prev = prevServer != null ? prevServer.getServerInfo().getName() : null;
+
+        // 1) Consult RoutingProvider SPI (highest priority first)
+        try {
+          if (api.hasRoutingProvider()) {
+            String reason = (prev == null ? "INITIAL" : "SWITCH");
+            var ctx = new PlayerRouteContext(player.getUniqueId(), player.getUsername(), serverName, reason);
+            boolean handled = api.selectRoute(ctx);
+            if (handled) {
+              if (ctx.isCancelled()) {
+                event.setResult(ServerPreConnectEvent.ServerResult.denied());
+                return;
+              }
+              String t = ctx.getTargetServer();
+              if (t != null && !t.equalsIgnoreCase(serverName)) {
+                proxyServer.getServer(t).ifPresentOrElse(rs -> event.setResult(ServerPreConnectEvent.ServerResult.allowed(rs)), () -> event.setResult(ServerPreConnectEvent.ServerResult.denied()));
+                return;
+              }
+              // If handled but no override, continue with default/event flow
+            }
+          }
+        } catch (Throwable ignored2) {}
+
+        // 2) Event-based interception (pre-events)
+        if (prev == null) {
+          var evt = new PlayerPreConnectEvent(player.getUniqueId(), player.getUsername(), serverName, serverName);
+          api.getEventBus().post(evt);
+          if (evt.isCancelled()) {
+            event.setResult(ServerPreConnectEvent.ServerResult.denied());
+            return;
+          }
+          String t = evt.getTargetServer();
+          if (t != null && !t.equalsIgnoreCase(serverName)) {
+            proxyServer.getServer(t).ifPresentOrElse(rs -> event.setResult(ServerPreConnectEvent.ServerResult.allowed(rs)), () -> event.setResult(ServerPreConnectEvent.ServerResult.denied()));
+            return;
+          }
+        } else {
+          var evt = new PlayerPreServerSwitchEvent(player.getUniqueId(), player.getUsername(), prev, serverName, "UNKNOWN");
+          api.getEventBus().post(evt);
+          if (evt.isCancelled()) {
+            event.setResult(ServerPreConnectEvent.ServerResult.denied());
+            return;
+          }
+          String t = evt.getTargetServer();
+          if (t != null && !t.equalsIgnoreCase(serverName)) {
+            proxyServer.getServer(t).ifPresentOrElse(rs -> event.setResult(ServerPreConnectEvent.ServerResult.allowed(rs)), () -> event.setResult(ServerPreConnectEvent.ServerResult.denied()));
+            return;
+          }
+        }
+      }
+    } catch (Throwable ignored) {}
 
     PteroServerInfo serverInfo = serverInfoMap.get(serverName);
     if (serverInfo == null) {

@@ -11,6 +11,9 @@ import de.tubyoub.velocitypteropower.manager.MessageKey;
 import de.tubyoub.velocitypteropower.manager.MessagesManager;
 import de.tubyoub.velocitypteropower.model.PteroServerInfo;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
+import de.tubyoub.vpp.api.VPPApiProvider;
+import de.tubyoub.vpp.api.event.PlayerPostConnectEvent;
+import de.tubyoub.vpp.api.event.PlayerDisconnectEvent;
 
 import java.util.concurrent.TimeUnit;
 
@@ -43,6 +46,15 @@ public class ServerSwitchListener {
       }
     } catch (Exception ignored) {}
 
+    // Fire public API PlayerDisconnectEvent
+    try {
+      var api = VPPApiProvider.get();
+      if (api != null) {
+        String last = player.getCurrentServer().map(sc -> sc.getServer().getServerInfo().getName()).orElse(null);
+        api.getEventBus().post(new PlayerDisconnectEvent(player.getUniqueId(), player.getUsername(), last));
+      }
+    } catch (Throwable ignored) {}
+
     player.getCurrentServer()
         .ifPresent(
             serverConnection -> {
@@ -63,6 +75,14 @@ public class ServerSwitchListener {
   public void onServerSwitch(ServerConnectedEvent event) {
     RegisteredServer newServer = event.getServer();
     String newServerName = newServer.getServerInfo().getName();
+
+    // Fire public API PlayerPostConnectEvent
+    try {
+      var api = VPPApiProvider.get();
+      if (api != null) {
+        api.getEventBus().post(new PlayerPostConnectEvent(event.getPlayer().getUniqueId(), event.getPlayer().getUsername(), newServerName));
+      }
+    } catch (Throwable ignored) {}
 
     // Record move history: previous -> new
     try {
