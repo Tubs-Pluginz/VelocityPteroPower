@@ -6,7 +6,5 @@
   "url": "https://github.com/Tubs-Pluginz/VelocityPteroPower",
   "authors": ["TubYoub"],
   "main": "de.tubyoub.velocitypteropower.VelocityPteroPower",
-  "dependencies": [
-    { "id": "velocity", "optional": false, "version": ">=3.0.0" }
-  ]
+  "dependencies": []
 }

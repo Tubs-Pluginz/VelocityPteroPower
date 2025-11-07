@@ -34,13 +34,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Plugin(
-        id = "velocity-ptero-power",
-        name = "VelocityPteroPower",
-        version = "0.9.5",
-        authors = {"TubYoub"},
-        description = "Manage Pterodactyl/Pelican/Mc Server Soft servers via Velocity.",
-        url = "https://github.com/Tubs-Pluginz/VelocityPteroPower")
 public class VelocityPteroPower {
     private static final String VERSION = "0.9.6-alpha";
     private static final String MODRINTH_PROJECT_ID = "1dDr5J4w";
