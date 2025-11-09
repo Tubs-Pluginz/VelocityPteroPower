@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>de.tubyoub</groupId>
-  <artifactId>VelocityPteroPower</artifactId>
+  <artifactId>velocitypteropower</artifactId>
   <version>0.9.6-alpha</version>
   <packaging>jar</packaging>
 
