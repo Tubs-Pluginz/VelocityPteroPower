@@ -24,8 +24,8 @@
   <developers>
     <developer>
       <id>tubyoub</id>
-      <name>Your Name</name>
-      <email>your.email@example.com</email>
+      <name>TubYoub</name>
+      <email>contact@tubyoub.de</email>
       <organization>Tubs-Pluginz</organization>
       <organizationUrl>https://github.com/Tubs-Pluginz</organizationUrl>
     </developer>
@@ -117,10 +117,76 @@
               <deploymentName>VelocityPteroPower-${project.version}</deploymentName>
             </configuration>
           </plugin>
+
+          <!-- Override javadoc plugin for release profile - API only -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>${javadoc.plugin.version}</version>
+            <executions>
+              <!-- Skip main javadoc in release mode to avoid Velocity API dependencies -->
+              <execution>
+                <id>attach-main-javadoc</id>
+                <phase>none</phase>
+              </execution>
+              <!-- Only generate API javadoc in release mode -->
+              <execution>
+                <id>attach-api-javadoc</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <configuration>
+                  <classifier>javadoc</classifier>
+                  <source>21</source>
+                  <quiet>true</quiet>
+                  <additionalJOption>-Xdoclint:none</additionalJOption>
+                  <sourcepath>${project.basedir}/src/main/java</sourcepath>
+                  <subpackages>de.tubyoub.vpp.api</subpackages>
+                  <groups>
+                    <group>
+                      <title>Public API</title>
+                      <packages>de.tubyoub.vpp.api*</packages>
+                    </group>
+                  </groups>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- Override source plugin for release profile - API sources only as main -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>${source.plugin.version}</version>
+            <executions>
+              <!-- Skip main sources in release mode -->
+              <execution>
+                <id>attach-main-sources</id>
+                <phase>none</phase>
+              </execution>
+              <!-- Generate API sources as main sources jar -->
+              <execution>
+                <id>attach-api-sources-as-main</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+                <configuration>
+                  <classifier>sources</classifier>
+                  <includes>
+                    <include>de/tubyoub/vpp/api/**</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
         </plugins>
       </build>
       <!-- Override dependencies to exclude SNAPSHOT versions when releasing -->
       <dependencies>
+        <!-- Exclude Velocity API completely -->
         <dependency>
           <groupId>com.velocitypowered</groupId>
           <artifactId>velocity-api</artifactId>
@@ -134,15 +200,18 @@
             </exclusion>
           </exclusions>
         </dependency>
+        <!-- Keep other dependencies for API -->
         <dependency>
           <groupId>dev.dejvokep</groupId>
           <artifactId>boosted-yaml</artifactId>
           <version>${boostedyaml.version}</version>
+          <optional>true</optional>
         </dependency>
         <dependency>
           <groupId>com.fasterxml.jackson.core</groupId>
           <artifactId>jackson-databind</artifactId>
           <version>${jackson.databind.version}</version>
+          <optional>true</optional>
         </dependency>
         <dependency>
           <groupId>net.kyori</groupId>
