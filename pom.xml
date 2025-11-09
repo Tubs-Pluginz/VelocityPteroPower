@@ -68,8 +68,32 @@
   </properties>
 
   <profiles>
+    <!-- Development profile with Velocity API - ACTIVE BY DEFAULT -->
+    <profile>
+      <id>dev</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>com.velocitypowered</groupId>
+          <artifactId>velocity-api</artifactId>
+          <version>${velocity.api.version}</version>
+          <scope>provided</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+
     <profile>
       <id>beta</id>
+      <dependencies>
+        <dependency>
+          <groupId>com.velocitypowered</groupId>
+          <artifactId>velocity-api</artifactId>
+          <version>${velocity.api.version}</version>
+          <scope>provided</scope>
+        </dependency>
+      </dependencies>
       <build>
         <resources>
           <resource>
@@ -80,7 +104,7 @@
       </build>
     </profile>
 
-    <!-- API-only release profile -->
+    <!-- API-only release profile - NO Velocity API at all -->
     <profile>
       <id>release</id>
       <build>
@@ -212,15 +236,6 @@
           </plugin>
         </plugins>
       </build>
-
-      <!-- API-only dependencies - NO Velocity at all -->
-      <dependencies>
-        <dependency>
-          <groupId>net.kyori</groupId>
-          <artifactId>adventure-text-minimessage</artifactId>
-          <version>${minimessage.version}</version>
-        </dependency>
-      </dependencies>
     </profile>
   </profiles>
 
@@ -459,14 +474,8 @@
     </repository>
   </repositories>
 
+  <!-- BASE DEPENDENCIES - NO VELOCITY API HERE -->
   <dependencies>
-    <dependency>
-      <groupId>com.velocitypowered</groupId>
-      <artifactId>velocity-api</artifactId>
-      <version>${velocity.api.version}</version>
-      <scope>provided</scope>
-    </dependency>
-
     <dependency>
       <groupId>dev.dejvokep</groupId>
       <artifactId>boosted-yaml</artifactId>

@@ -32,7 +32,7 @@ jobs:
 
       - name: Build with Maven (shade)
         run: |
-          mvn -B -V -e -DskipTests package
+          mvn -B -V -e -DskipTests package -P dev
 
       - name: Determine version and rename artifact
         id: meta
