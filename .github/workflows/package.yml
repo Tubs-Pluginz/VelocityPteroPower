@@ -14,7 +14,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: api-alpha-${{ github.ref }}
@@ -22,10 +21,10 @@ concurrency:
 
 jobs:
   deploy-alpha:
-    name: Deploy alpha package to GitHub Packages & Maven Central
+    name: Deploy alpha package to Maven Central (API changed)
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: maven-central # optional: for approval gates
+    environment: maven-central
 
     steps:
       - name: Checkout
@@ -72,14 +71,6 @@ jobs:
           mvn -B -q versions:set -DnewVersion="${{ steps.meta.outputs.new_version }}"
           mvn -B -q -DskipTests package
 
-      - name: Deploy to GitHub Packages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mvn -B -DskipTests deploy \
-            -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}"
-
       - name: Deploy to Maven Central (Alpha)
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
@@ -87,12 +78,10 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          # Deploy only the API artifacts to Maven Central
-          mvn -B -DskipTests deploy -P release \
-            -Dcentral.publishing.serverId=central
+          mvn -B -DskipTests deploy -P release
 
   deploy-release:
-    name: Deploy release package to both repositories
+    name: Deploy release package to Maven Central
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     environment: maven-central
@@ -137,14 +126,6 @@ jobs:
           mvn -B -q versions:set -DnewVersion="${{ steps.rel.outputs.version }}"
           mvn -B -q -DskipTests package
 
-      - name: Deploy to GitHub Packages (Release)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mvn -B -DskipTests deploy \
-            -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}"
-
       - name: Deploy to Maven Central (Release)
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
@@ -152,5 +133,4 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          mvn -B -DskipTests deploy -P release \
-            -Dcentral.publishing.serverId=central
+          mvn -B -DskipTests deploy -P release
