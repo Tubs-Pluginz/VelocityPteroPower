@@ -1,25 +1,29 @@
-name: Publish Maven (API to GitHub Packages)
+name: Publish API package (alpha on API changes)
 
 on:
   push:
-    branches: ['**']
-    paths-ignore:
-      - 'workflows/**'
-      - 'README.md'
-      - '.github/workflows/**'
+    branches: [ "**" ]
+    paths:
+      - 'src/**/api/**'
+      - 'docs/api/**'
+      - 'pom.xml'
+      - '.github/workflows/package.yml'
   release:
-    types: [published]
+    types: [ published ]
+  workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: maven-publish-${{ github.ref }}
-  cancel-in-progress: true
+  group: api-alpha-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  publish-api:
+  deploy-alpha:
+    name: Deploy alpha package to GitHub Packages (API changed)
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
@@ -28,98 +32,107 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup JDK 21
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
-      - name: Detect API changes (push only)
+      - name: Compute alpha version
         id: meta
+        shell: bash
         run: |
           set -euo pipefail
+          # Read current version from POM (root module only)
+          POM_VERSION=$(mvn -q -Dexec.executable=echo \
+            -Dexec.args='${project.version}' \
+            --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
+
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+
+          # Strip common pre-release suffixes before appending our alpha
+          # Examples: 0.9.6-alpha -> 0.9.6 ; 0.9.6-SNAPSHOT -> 0.9.6 ; 0.9.6-rc1 -> 0.9.6
+          BASE_VERSION=$(echo "$POM_VERSION" | sed -E 's/-(alpha|snapshot|SNAPSHOT|rc[0-9]+)$//')
+
+          NEW_VERSION="${BASE_VERSION}-alpha-${SHORT_SHA}"
+
+          echo "POM_VERSION=$POM_VERSION"
+          echo "BASE_VERSION=$BASE_VERSION"
+          echo "NEW_VERSION=$NEW_VERSION"
+
+          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
-          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
-            BASE="$(git rev-parse HEAD^ || true)"
-            if [[ -z "${BASE}" ]]; then BASE="$(git rev-list --max-parents=0 HEAD | tail -n1)"; fi
-            if git diff --name-only "$BASE" HEAD | grep -E '^src/main/(java|resources)/de/tubyoub/vpp/api/'; then
-              echo "api_changed=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "api_changed=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "api_changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build (package)
-        run: mvn -B -V -DskipTests package
-
-      - name: Configure Maven settings for GitHub Packages
-        run: |
-          mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml << 'XML'
-          <settings>
-            <servers>
-              <server>
-                <id>github</id>
-                <username>${env.GITHUB_ACTOR}</username>
-                <password>${env.GITHUB_TOKEN}</password>
-              </server>
-            </servers>
-          </settings>
-          XML
-
-      - name: Deploy alpha (push with API changes)
-        if: ${{ github.event_name == 'push' && steps.meta.outputs.api_changed == 'true' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
-        run: |
-            set -euo pipefail
-            
-            # Read current version from POM
-            POM_VERSION=$(mvn -q -Dexec.executable=echo \
-              -Dexec.args='${project.version}' \
-              --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
-            
-            SHORT_SHA="${{ steps.meta.outputs.short_sha }}"
-            
-            # Strip common pre-release suffixes before appending our alpha
-            # Examples: 0.9.6-alpha -> 0.9.6 ; 0.9.6-SNAPSHOT -> 0.9.6 ; 0.9.6-rc1 -> 0.9.6
-            BASE_VERSION=$(echo "$POM_VERSION" | sed -E 's/-(alpha|snapshot|SNAPSHOT|rc[0-9]+)$//')
-            
-            NEW_VERSION="${BASE_VERSION}-alpha-${SHORT_SHA}"
-            
-            echo "POM_VERSION=$POM_VERSION"
-            echo "BASE_VERSION=$BASE_VERSION"
-            echo "NEW_VERSION=$NEW_VERSION"
-            
-            # Set and build with the new unique version
-            mvn -B -q versions:set -DnewVersion="${NEW_VERSION}"
-            mvn -B -q -DskipTests package
-            
-            # Deploy using default layout required by GitHub Packages
-            mvn -B -DskipTests deploy \
-              -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}" \
-              -DdeployAtEnd=true
-
-      - name: Deploy release (on GitHub Release)
-        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTOR: ${{ github.actor }}
+      - name: Build with alpha version
+        shell: bash
         run: |
           set -euo pipefail
-          TAG="${{ github.event.release.tag_name }}"
-          # If tag looks like a version, set it; otherwise use existing POM version
-          if [[ "$TAG" =~ ^[0-9]+(\.[0-9]+){1,2}.*$ ]]; then
-            mvn -B -q versions:set -DnewVersion="${TAG}"
-          fi
-
+          mvn -B -q versions:set -DnewVersion="${{ steps.meta.outputs.new_version }}"
           mvn -B -q -DskipTests package
 
+      - name: Deploy to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Deploy using default layout required by GitHub Packages
           mvn -B -DskipTests deploy \
-            -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }} \
+            -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}" \
+            -DdeployAtEnd=true
+
+  deploy-release:
+    name: Deploy release package to GitHub Packages (on GitHub Release)
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Compute release version from tag
+        id: rel
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          if [ -z "$TAG_NAME" ]; then
+            echo "No tag name found in release payload" >&2
+            exit 1
+          fi
+          # Strip leading 'v' or 'V' if used (e.g., v1.2.3 -> 1.2.3)
+          VERSION=${TAG_NAME#v}
+          VERSION=${VERSION#V}
+          echo "Computed release version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set project version and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -q versions:set -DnewVersion="${{ steps.rel.outputs.version }}"
+          mvn -B -q -DskipTests package
+
+      - name: Deploy release to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mvn -B -DskipTests deploy \
+            -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}" \
             -DdeployAtEnd=true
