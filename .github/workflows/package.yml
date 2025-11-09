@@ -100,9 +100,9 @@ jobs:
             mvn -B -q versions:set -DnewVersion="${NEW_VERSION}"
             mvn -B -q -DskipTests package
             
-            # Deploy using modern alt repo syntax (no ::default)
+            # Deploy using default layout required by GitHub Packages
             mvn -B -DskipTests deploy \
-              -DaltDeploymentRepository="github::https://maven.pkg.github.com/${{ github.repository }}" \
+              -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}" \
               -DdeployAtEnd=true
 
       - name: Deploy release (on GitHub Release)
