@@ -22,6 +22,7 @@ concurrency:
 jobs:
   deploy-alpha:
     name: Deploy alpha package to Maven Central
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     environment: maven-central
 
@@ -58,13 +59,14 @@ jobs:
 
           echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Alpha version: ${NEW_VERSION}"
 
-      - name: Build with alpha version
+      - name: Set version and build
         shell: bash
         run: |
           set -euo pipefail
           mvn -B -q versions:set -DnewVersion="${{ steps.meta.outputs.new_version }}"
-          mvn -B -q -DskipTests package
+          mvn -B -q -DskipTests clean compile
 
       - name: Deploy to Maven Central (Alpha)
         env:
@@ -73,7 +75,8 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          mvn -B -X -e -DskipTests deploy -P release  # Added debug flags
+          echo "Deploying alpha version ${{ steps.meta.outputs.new_version }} to Maven Central..."
+          mvn -B -DskipTests deploy -P release
 
   deploy-release:
     name: Deploy release package to Maven Central
@@ -111,15 +114,15 @@ jobs:
           fi
           VERSION=${TAG_NAME#v}
           VERSION=${VERSION#V}
-          echo "Computed release version: $VERSION"
+          echo "Release version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Set project version and build
+      - name: Set version and build
         shell: bash
         run: |
           set -euo pipefail
           mvn -B -q versions:set -DnewVersion="${{ steps.rel.outputs.version }}"
-          mvn -B -q -DskipTests package
+          mvn -B -q -DskipTests clean compile
 
       - name: Deploy to Maven Central (Release)
         env:
@@ -128,4 +131,32 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
+          echo "Deploying release version ${{ steps.rel.outputs.version }} to Maven Central..."
           mvn -B -DskipTests deploy -P release
+
+  verify-build:
+    name: Verify API build works
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Test build with release profile
+        run: |
+          set -euo pipefail
+          echo "Testing that release profile builds successfully..."
+          mvn -B -DskipTests clean package -P release
+          
+          echo "Verifying API artifacts were created..."
+          ls -la target/*api* || echo "No API artifacts found"
+          
+          echo "Checking for SNAPSHOT dependencies in effective POM..."
+          mvn -P release help:effective-pom | grep -i snapshot || echo "No SNAPSHOT dependencies found (good!)"

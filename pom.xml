@@ -119,6 +119,37 @@
           </plugin>
         </plugins>
       </build>
+      <!-- Override dependencies to exclude SNAPSHOT versions when releasing -->
+      <dependencies>
+        <dependency>
+          <groupId>com.velocitypowered</groupId>
+          <artifactId>velocity-api</artifactId>
+          <version>${velocity.api.version}</version>
+          <scope>provided</scope>
+          <optional>true</optional>
+          <exclusions>
+            <exclusion>
+              <groupId>*</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>dev.dejvokep</groupId>
+          <artifactId>boosted-yaml</artifactId>
+          <version>${boostedyaml.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+          <version>${jackson.databind.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>net.kyori</groupId>
+          <artifactId>adventure-text-minimessage</artifactId>
+          <version>${minimessage.version}</version>
+        </dependency>
+      </dependencies>
     </profile>
   </profiles>
 
