@@ -1,5 +1,6 @@
 package dev.example.vppaddons;
 
+import com.google.inject.Inject;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.plugin.Plugin;
@@ -7,6 +8,7 @@ import de.tubyoub.vpp.api.*;
 import de.tubyoub.vpp.api.event.PlayerPostConnectEvent;
 import de.tubyoub.vpp.api.event.VPPEvent;
 import de.tubyoub.vpp.api.event.VPPEventBus;
+import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 
 import java.net.URI;
 import java.time.Duration;
@@ -18,10 +20,16 @@ public final class SampleAddon {
 
     private VPPApi api;
     private AddonConfig cfg;
+    private ComponentLogger logger;
 
     // Keep reference so we can unregister
     private de.tubyoub.vpp.api.routing.RoutingProvider registeredRouter;
     private AutoCloseable eventSubHandle;
+
+    @Inject
+    public SampleAddon(ComponentLogger logger) {
+        this.logger = logger;
+    }
 
     // 1) Minimal AddonCommand: /ptero greet [name]
     public static final class GreetCmd implements AddonCommand {
@@ -228,7 +236,11 @@ public final class SampleAddon {
     public void onInit(ProxyInitializeEvent e) {
         this.api = VPPApiProvider.get();
         if (api == null) {
-            System.out.println("[VPP-SAMPLE] VPP API not available. Is VelocityPteroPower installed?");
+            logger.error("[VPP-SAMPLE] VPP API not available. Is VelocityPteroPower installed?");
+            return;
+        }
+        if (api.getApiVersion() != "1.0.1"){
+            logger.error("[VPP-SAMPLE] VPP API is on the wrong version. Is VelocityPteroPower up to date?");
             return;
         }
         System.out.println("[VPP-SAMPLE] Starting sample addon with API=" + api.getApiVersion());
