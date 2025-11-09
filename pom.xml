@@ -10,8 +10,9 @@
   <packaging>jar</packaging>
 
   <name>VelocityPteroPower</name>
-  <description>Velocity plugin that integrates with Pterodactyl/Pelican/Mc Server Soft; includes a slim public API (classifier: api)</description>
-  <url>https://github.com/TubYoub/VelocityPteroPower</url>
+  <description>A Velocity plugin for Pterodactyl power management with public API for developers</description>
+  <url>https://github.com/Tubs-Pluginz/VelocityPteroPower</url>
+
   <licenses>
     <license>
       <name>MIT License</name>
@@ -19,18 +20,21 @@
       <distribution>repo</distribution>
     </license>
   </licenses>
+
   <developers>
     <developer>
       <id>tubyoub</id>
       <name>TubYoub</name>
-      <url>https://github.com/TubYoub</url>
+      <email>contact@tubyoub.de</email>
+      <organization>Tubs-Pluginz</organization>
+      <organizationUrl>https://github.com/Tubs-Pluginz</organizationUrl>
     </developer>
   </developers>
+
   <scm>
-    <connection>scm:git:https://github.com/TubYoub/VelocityPteroPower.git</connection>
-    <developerConnection>scm:git:ssh://git@github.com/TubYoub/VelocityPteroPower.git</developerConnection>
-    <url>https://github.com/TubYoub/VelocityPteroPower</url>
-    <tag>HEAD</tag>
+    <connection>scm:git:git://github.com/Tubs-Pluginz/VelocityPteroPower.git</connection>
+    <developerConnection>scm:git:ssh://github.com:Tubs-Pluginz/VelocityPteroPower.git</developerConnection>
+    <url>https://github.com/Tubs-Pluginz/VelocityPteroPower/tree/main</url>
   </scm>
 
   <properties>
@@ -59,8 +63,65 @@
     <javadoc.plugin.version>3.6.3</javadoc.plugin.version>
     <source.plugin.version>3.3.1</source.plugin.version>
     <exec.plugin.version>3.1.0</exec.plugin.version>
+    <central.plugin.version>0.9.0</central.plugin.version>
+    <gpg.plugin.version>3.2.8</gpg.plugin.version>
   </properties>
 
+  <profiles>
+    <profile>
+      <id>beta</id>
+      <build>
+        <resources>
+          <resource>
+            <directory>src/main/resources</directory>
+            <filtering>true</filtering>
+          </resource>
+        </resources>
+      </build>
+    </profile>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <!-- Sign artifacts for Maven Central -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>${gpg.plugin.version}</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <configuration>
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                    <argument>--batch</argument>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- Maven Central Portal Publishing -->
+          <plugin>
+              <groupId>org.sonatype.central</groupId>
+              <artifactId>central-publishing-maven-plugin</artifactId>
+              <version>${central.plugin.version}</version>
+              <extensions>true</extensions>
+              <configuration>
+                <publishingServerId>central</publishingServerId>
+                <autoPublish>true</autoPublish>
+                <waitUntil>published</waitUntil>
+                <deploymentName>VelocityPteroPower-${project.version}</deploymentName>
+              </configuration>
+            </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
   <build>
     <resources>
@@ -171,21 +232,12 @@
         </executions>
       </plugin>
 
-      <!-- Attach sources for both main artifact and API classifier -->
+      <!-- Attach sources and javadoc for the API classifier -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
         <version>${source.plugin.version}</version>
         <executions>
-          <!-- Main sources (required by Maven Central) -->
-          <execution>
-            <id>attach-sources</id>
-            <phase>package</phase>
-            <goals>
-              <goal>jar-no-fork</goal>
-            </goals>
-          </execution>
-          <!-- API-only sources -->
           <execution>
             <id>attach-api-sources</id>
             <phase>package</phase>
@@ -207,21 +259,6 @@
         <artifactId>maven-javadoc-plugin</artifactId>
         <version>${javadoc.plugin.version}</version>
         <executions>
-          <!-- Main javadoc (required by Maven Central) -->
-          <execution>
-            <id>attach-javadoc</id>
-            <phase>package</phase>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-            <configuration>
-              <source>21</source>
-              <quiet>true</quiet>
-              <additionalJOption>-Xdoclint:none</additionalJOption>
-              <excludePackageNames>de.tubyoub.vpp.internal:de.tubyoub.vpp.impl</excludePackageNames>
-            </configuration>
-          </execution>
-          <!-- API-only javadoc as separate classifier -->
           <execution>
             <id>attach-api-javadoc</id>
             <phase>package</phase>
@@ -286,6 +323,19 @@
     </plugins>
   </build>
 
+  <!-- GitHub Packages repository -->
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub Packages (Releases)</name>
+      <url>https://maven.pkg.github.com/Tubs-Pluginz/VelocityPteroPower</url>
+    </repository>
+    <snapshotRepository>
+      <id>github</id>
+      <name>GitHub Packages (Snapshots)</name>
+      <url>https://maven.pkg.github.com/Tubs-Pluginz/VelocityPteroPower</url>
+    </snapshotRepository>
+  </distributionManagement>
 
   <repositories>
     <repository>
@@ -320,58 +370,4 @@
       <version>${minimessage.version}</version>
     </dependency>
   </dependencies>
-
-  <!-- OSSRH distribution management for Maven Central -->
-  <distributionManagement>
-    <snapshotRepository>
-      <id>ossrh</id>
-      <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-    </snapshotRepository>
-    <repository>
-      <id>ossrh</id>
-      <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-    </repository>
-  </distributionManagement>
-
-  <!-- Profile enabling signing + Nexus staging only when publishing to Central -->
-  <profiles>
-    <profile>
-      <id>central-release</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
-            <version>1.7.0</version>
-            <extensions>true</extensions>
-            <configuration>
-              <serverId>ossrh</serverId>
-              <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-              <autoReleaseAfterClose>true</autoReleaseAfterClose>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <version>3.2.8</version>
-            <executions>
-              <execution>
-                <id>sign-artifacts</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>sign</goal>
-                </goals>
-                <configuration>
-                  <gpgArguments>
-                    <arg>--pinentry-mode</arg>
-                    <arg>loopback</arg>
-                  </gpgArguments>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 </project>

@@ -22,9 +22,10 @@ concurrency:
 
 jobs:
   deploy-alpha:
-    name: Deploy alpha package to GitHub Packages (API changed)
+    name: Deploy alpha package to GitHub Packages & Maven Central
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: maven-central # optional: for approval gates
 
     steps:
       - name: Checkout
@@ -38,26 +39,23 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-          server-id: github
-          server-username: GITHUB_ACTOR
-          server-password: GITHUB_TOKEN
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Compute alpha version
         id: meta
         shell: bash
         run: |
           set -euo pipefail
-          # Read current version from POM (root module only)
           POM_VERSION=$(mvn -q -Dexec.executable=echo \
             -Dexec.args='${project.version}' \
             --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
 
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
-
-          # Strip common pre-release suffixes before appending our alpha
-          # Examples: 0.9.6-alpha -> 0.9.6 ; 0.9.6-SNAPSHOT -> 0.9.6 ; 0.9.6-rc1 -> 0.9.6
           BASE_VERSION=$(echo "$POM_VERSION" | sed -E 's/-(alpha|snapshot|SNAPSHOT|rc[0-9]+)$//')
-
           NEW_VERSION="${BASE_VERSION}-alpha-${SHORT_SHA}"
 
           echo "POM_VERSION=$POM_VERSION"
@@ -79,15 +77,25 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Deploy using default layout required by GitHub Packages
           mvn -B -DskipTests deploy \
-            -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}" \
-            -DdeployAtEnd=true
+            -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}"
+
+      - name: Deploy to Maven Central (Alpha)
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # Deploy only the API artifacts to Maven Central
+          mvn -B -DskipTests deploy -P release \
+            -Dcentral.publishing.serverId=central
 
   deploy-release:
-    name: Deploy release package to GitHub Packages (on GitHub Release)
+    name: Deploy release package to both repositories
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    environment: maven-central
 
     steps:
       - name: Checkout
@@ -101,9 +109,11 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-          server-id: github
-          server-username: GITHUB_ACTOR
-          server-password: GITHUB_TOKEN
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Compute release version from tag
         id: rel
@@ -115,7 +125,6 @@ jobs:
             echo "No tag name found in release payload" >&2
             exit 1
           fi
-          # Strip leading 'v' or 'V' if used (e.g., v1.2.3 -> 1.2.3)
           VERSION=${TAG_NAME#v}
           VERSION=${VERSION#V}
           echo "Computed release version: $VERSION"
@@ -128,28 +137,20 @@ jobs:
           mvn -B -q versions:set -DnewVersion="${{ steps.rel.outputs.version }}"
           mvn -B -q -DskipTests package
 
-      - name: Deploy release to GitHub Packages
+      - name: Deploy to GitHub Packages (Release)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mvn -B -DskipTests deploy \
-            -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}" \
-            -DdeployAtEnd=true
+            -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}"
 
-      - name: Set up Java for Maven Central (OSSRH) with GPG
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: 'maven'
-          server-id: ossrh
-          server-username: OSSRH_USERNAME
-          server-password: OSSRH_PASSWORD
-      - name: Deploy release to Maven Central (OSSRH)
+      - name: Deploy to Maven Central (Release)
         env:
-          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          mvn -B -P central-release -DskipTests deploy -DdeployAtEnd=true
+          mvn -B -DskipTests deploy -P release \
+            -Dcentral.publishing.serverId=central

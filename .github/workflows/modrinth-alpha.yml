@@ -46,9 +46,9 @@ jobs:
 
           # Prefer shaded jar; fall back to any non-original matching jar
           shopt -s nullglob
-          CANDIDATES=(target/VelocityPteroPower-*-shaded.jar)
+          CANDIDATES=(target/velocitypteropower-*-shaded.jar)
           if [ ${#CANDIDATES[@]} -lt 1 ]; then
-            FILES=(target/VelocityPteroPower-*.jar)
+            FILES=(target/velocitypteropower-*.jar)
             FILTERED=()
             for f in "${FILES[@]}"; do [[ "$f" != *-original.jar ]] && FILTERED+=("$f"); done
             CANDIDATES=("${FILTERED[@]}")
@@ -59,7 +59,7 @@ jobs:
             exit 1
           fi
           SRC="${CANDIDATES[0]}"
-          DST="target/VelocityPteroPower-${VERSION}.jar"
+          DST="target/velocitypteropower-${VERSION}.jar"
           mv "$SRC" "$DST"
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
