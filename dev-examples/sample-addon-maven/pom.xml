@@ -28,7 +28,13 @@
             <id>papermc-repo</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/Tubs-Pluginz/VelocityPteroPower</url>
+          </repository>
     </repositories>
+
 
     <dependencies>
         <!-- Velocity API at compile-time only -->
@@ -55,11 +61,11 @@
             </activation>
             <dependencies>
                 <dependency>
-                    <groupId>de.tubyoub</groupId>
-                    <artifactId>VelocityPteroPower</artifactId>
-                    <version>${vpp.version}</version>
-                    <scope>system</scope>
-                    <systemPath>${vpp.local.api.jar}</systemPath>
+                  <groupId>de.tubyoub</groupId>
+                  <artifactId>velocitypteropower</artifactId>
+                  <version>0.9.6-alpha-4aca5fa</version>
+                  <classifier>api</classifier>
+                  <scope>provided</scope>
                 </dependency>
             </dependencies>
         </profile>

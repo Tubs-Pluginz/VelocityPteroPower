@@ -136,3 +136,20 @@ jobs:
           mvn -B -DskipTests deploy \
             -DaltDeploymentRepository="github::default::https://maven.pkg.github.com/${{ github.repository }}" \
             -DdeployAtEnd=true
+
+      - name: Set up Java for Maven Central (OSSRH) with GPG
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: ossrh
+          server-username: OSSRH_USERNAME
+          server-password: OSSRH_PASSWORD
+      - name: Deploy release to Maven Central (OSSRH)
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mvn -B -P central-release -DskipTests deploy -DdeployAtEnd=true
