@@ -104,7 +104,7 @@
               </execution>
             </executions>
           </plugin>
-          <!-- Maven Central Portal Publishing -->
+          <!-- Maven Central Portal Publishing - FIXED CONFIGURATION -->
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
@@ -113,7 +113,7 @@
             <configuration>
               <publishingServerId>central</publishingServerId>
               <autoPublish>true</autoPublish>
-              <waitUntil>true</waitUntil>
+              <waitUntil>published</waitUntil>
               <deploymentName>VelocityPteroPower-${project.version}</deploymentName>
             </configuration>
           </plugin>
@@ -322,7 +322,6 @@
     </plugins>
   </build>
 
-  <!-- GitHub Packages repository removed -->
   <distributionManagement>
     <repository>
       <id>central</id>
