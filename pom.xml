@@ -31,7 +31,7 @@
     </developer>
   </developers>
 
-  <scm>
+<scm>
     <connection>scm:git:https://github.com/Tubs-Pluginz/VelocityPteroPower.git</connection>
     <developerConnection>scm:git:ssh://github.com:Tubs-Pluginz/VelocityPteroPower.git</developerConnection>
     <url>https://github.com/Tubs-Pluginz/VelocityPteroPower/tree/main</url>
@@ -80,7 +80,7 @@
       </build>
     </profile>
 
-    <!-- API-only release profile - completely different approach -->
+    <!-- API-only release profile -->
     <profile>
       <id>release</id>
       <build>
@@ -112,14 +112,24 @@
             </configuration>
           </plugin>
 
-          <!-- Sources: Only API sources -->
+          <!-- Disable default source and javadoc executions -->
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-source-plugin</artifactId>
             <version>${source.plugin.version}</version>
             <executions>
+              <!-- Disable main build executions -->
               <execution>
-                <id>attach-sources</id>
+                <id>attach-main-sources</id>
+                <phase>none</phase>
+              </execution>
+              <execution>
+                <id>attach-api-sources</id>
+                <phase>none</phase>
+              </execution>
+              <!-- API-only sources for release -->
+              <execution>
+                <id>attach-release-sources</id>
                 <phase>package</phase>
                 <goals>
                   <goal>jar-no-fork</goal>
@@ -133,14 +143,23 @@
             </executions>
           </plugin>
 
-          <!-- Javadoc: Only API classes -->
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-javadoc-plugin</artifactId>
             <version>${javadoc.plugin.version}</version>
             <executions>
+              <!-- Disable main build executions -->
               <execution>
-                <id>attach-javadocs</id>
+                <id>attach-main-javadoc</id>
+                <phase>none</phase>
+              </execution>
+              <execution>
+                <id>attach-api-javadoc</id>
+                <phase>none</phase>
+              </execution>
+              <!-- API-only javadoc for release -->
+              <execution>
+                <id>attach-release-javadocs</id>
                 <phase>package</phase>
                 <goals>
                   <goal>jar</goal>
@@ -279,7 +298,7 @@
         </executions>
       </plugin>
 
-      <!-- Create normal and API classifier jars -->
+      <!-- Create normal and API classifier jars (only for non-release builds) -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
@@ -314,7 +333,7 @@
         </executions>
       </plugin>
 
-      <!-- Attach standard sources for main artifact AND api-only sources as extra classifier -->
+      <!-- Sources for normal builds -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
@@ -343,7 +362,7 @@
         </executions>
       </plugin>
 
-      <!-- Attach standard javadoc for main artifact AND api-only javadoc as extra classifier -->
+      <!-- Javadoc for normal builds -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
@@ -391,7 +410,7 @@
         <version>${deploy.plugin.version}</version>
       </plugin>
 
-      <!-- Site/release plugins kept (not essential to deploy) -->
+      <!-- Site/release plugins -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-site-plugin</artifactId>
