@@ -21,8 +21,7 @@ concurrency:
 
 jobs:
   deploy-alpha:
-    name: Deploy alpha package to Maven Central (API changed)
-    if: github.event_name == 'push'
+    name: Deploy alpha package to Maven Central
     runs-on: ubuntu-latest
     environment: maven-central
 
@@ -57,10 +56,6 @@ jobs:
           BASE_VERSION=$(echo "$POM_VERSION" | sed -E 's/-(alpha|snapshot|SNAPSHOT|rc[0-9]+)$//')
           NEW_VERSION="${BASE_VERSION}-alpha-${SHORT_SHA}"
 
-          echo "POM_VERSION=$POM_VERSION"
-          echo "BASE_VERSION=$BASE_VERSION"
-          echo "NEW_VERSION=$NEW_VERSION"
-
           echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
@@ -78,7 +73,7 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          mvn -B -DskipTests deploy -P release
+          mvn -B -X -e -DskipTests deploy -P release  # Added debug flags
 
   deploy-release:
     name: Deploy release package to Maven Central

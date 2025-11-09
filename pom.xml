@@ -24,15 +24,15 @@
   <developers>
     <developer>
       <id>tubyoub</id>
-      <name>TubYoub</name>
-      <email>contact@tubyoub.de</email>
+      <name>Your Name</name>
+      <email>your.email@example.com</email>
       <organization>Tubs-Pluginz</organization>
       <organizationUrl>https://github.com/Tubs-Pluginz</organizationUrl>
     </developer>
   </developers>
 
   <scm>
-    <connection>scm:git:git://github.com/Tubs-Pluginz/VelocityPteroPower.git</connection>
+    <connection>scm:git:https://github.com/Tubs-Pluginz/VelocityPteroPower.git</connection>
     <developerConnection>scm:git:ssh://github.com:Tubs-Pluginz/VelocityPteroPower.git</developerConnection>
     <url>https://github.com/Tubs-Pluginz/VelocityPteroPower/tree/main</url>
   </scm>
@@ -83,7 +83,7 @@
       <id>release</id>
       <build>
         <plugins>
-          <!-- Sign artifacts for Maven Central -->
+          <!-- Sign ALL artifacts -->
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
@@ -99,7 +99,6 @@
                   <gpgArguments>
                     <arg>--pinentry-mode</arg>
                     <arg>loopback</arg>
-                    <argument>--batch</argument>
                   </gpgArguments>
                 </configuration>
               </execution>
@@ -107,17 +106,17 @@
           </plugin>
           <!-- Maven Central Portal Publishing -->
           <plugin>
-              <groupId>org.sonatype.central</groupId>
-              <artifactId>central-publishing-maven-plugin</artifactId>
-              <version>${central.plugin.version}</version>
-              <extensions>true</extensions>
-              <configuration>
-                <publishingServerId>central</publishingServerId>
-                <autoPublish>true</autoPublish>
-                <waitUntil>published</waitUntil>
-                <deploymentName>VelocityPteroPower-${project.version}</deploymentName>
-              </configuration>
-            </plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>${central.plugin.version}</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>true</autoPublish>
+              <waitUntil>true</waitUntil>
+              <deploymentName>VelocityPteroPower-${project.version}</deploymentName>
+            </configuration>
+          </plugin>
         </plugins>
       </build>
     </profile>
@@ -323,18 +322,13 @@
     </plugins>
   </build>
 
-  <!-- GitHub Packages repository -->
+  <!-- GitHub Packages repository removed -->
   <distributionManagement>
     <repository>
-      <id>github</id>
-      <name>GitHub Packages (Releases)</name>
-      <url>https://maven.pkg.github.com/Tubs-Pluginz/VelocityPteroPower</url>
+      <id>central</id>
+      <name>Maven Central Portal</name>
+      <url>https://central.sonatype.com/api/v1/publisher</url>
     </repository>
-    <snapshotRepository>
-      <id>github</id>
-      <name>GitHub Packages (Snapshots)</name>
-      <url>https://maven.pkg.github.com/Tubs-Pluginz/VelocityPteroPower</url>
-    </snapshotRepository>
   </distributionManagement>
 
   <repositories>
