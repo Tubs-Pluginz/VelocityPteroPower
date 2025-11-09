@@ -231,12 +231,19 @@
         </executions>
       </plugin>
 
-      <!-- Attach sources and javadoc for the API classifier -->
+      <!-- Attach standard sources for main artifact AND api-only sources as extra classifier -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
         <version>${source.plugin.version}</version>
         <executions>
+          <execution>
+            <id>attach-main-sources</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
           <execution>
             <id>attach-api-sources</id>
             <phase>package</phase>
@@ -253,11 +260,24 @@
         </executions>
       </plugin>
 
+      <!-- Attach standard javadoc for main artifact AND api-only javadoc as extra classifier -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <version>${javadoc.plugin.version}</version>
         <executions>
+          <execution>
+            <id>attach-main-javadoc</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <source>21</source>
+              <quiet>true</quiet>
+              <additionalJOption>-Xdoclint:none</additionalJOption>
+            </configuration>
+          </execution>
           <execution>
             <id>attach-api-javadoc</id>
             <phase>package</phase>
