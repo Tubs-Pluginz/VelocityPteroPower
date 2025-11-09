@@ -79,11 +79,84 @@
         </resources>
       </build>
     </profile>
+
+    <!-- API-only release profile - completely different approach -->
     <profile>
       <id>release</id>
       <build>
         <plugins>
-          <!-- Sign ALL artifacts -->
+          <!-- Compiler: ONLY compile API sources -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>${compiler.plugin.version}</version>
+            <configuration>
+              <source>${java.version}</source>
+              <target>${java.version}</target>
+              <release>${java.version}</release>
+              <includes>
+                <include>de/tubyoub/vpp/api/**/*.java</include>
+              </includes>
+            </configuration>
+          </plugin>
+
+          <!-- JAR: Only include compiled API classes -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>3.3.0</version>
+            <configuration>
+              <includes>
+                <include>de/tubyoub/vpp/api/**</include>
+              </includes>
+            </configuration>
+          </plugin>
+
+          <!-- Sources: Only API sources -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>${source.plugin.version}</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+                <configuration>
+                  <includes>
+                    <include>de/tubyoub/vpp/api/**</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- Javadoc: Only API classes -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>${javadoc.plugin.version}</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <configuration>
+                  <source>21</source>
+                  <quiet>true</quiet>
+                  <additionalJOption>-Xdoclint:none</additionalJOption>
+                  <sourcepath>${project.basedir}/src/main/java</sourcepath>
+                  <subpackages>de.tubyoub.vpp.api</subpackages>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- GPG Signing -->
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
@@ -104,7 +177,8 @@
               </execution>
             </executions>
           </plugin>
-          <!-- Maven Central Portal Publishing - FIXED CONFIGURATION -->
+
+          <!-- Maven Central Publishing -->
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>
@@ -117,102 +191,11 @@
               <deploymentName>VelocityPteroPower-${project.version}</deploymentName>
             </configuration>
           </plugin>
-
-          <!-- Override javadoc plugin for release profile - API only -->
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <version>${javadoc.plugin.version}</version>
-            <executions>
-              <!-- Skip main javadoc in release mode to avoid Velocity API dependencies -->
-              <execution>
-                <id>attach-main-javadoc</id>
-                <phase>none</phase>
-              </execution>
-              <!-- Only generate API javadoc in release mode -->
-              <execution>
-                <id>attach-api-javadoc</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <classifier>javadoc</classifier>
-                  <source>21</source>
-                  <quiet>true</quiet>
-                  <additionalJOption>-Xdoclint:none</additionalJOption>
-                  <sourcepath>${project.basedir}/src/main/java</sourcepath>
-                  <subpackages>de.tubyoub.vpp.api</subpackages>
-                  <groups>
-                    <group>
-                      <title>Public API</title>
-                      <packages>de.tubyoub.vpp.api*</packages>
-                    </group>
-                  </groups>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-
-          <!-- Override source plugin for release profile - API sources only as main -->
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-source-plugin</artifactId>
-            <version>${source.plugin.version}</version>
-            <executions>
-              <!-- Skip main sources in release mode -->
-              <execution>
-                <id>attach-main-sources</id>
-                <phase>none</phase>
-              </execution>
-              <!-- Generate API sources as main sources jar -->
-              <execution>
-                <id>attach-api-sources-as-main</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar-no-fork</goal>
-                </goals>
-                <configuration>
-                  <classifier>sources</classifier>
-                  <includes>
-                    <include>de/tubyoub/vpp/api/**</include>
-                  </includes>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-
         </plugins>
       </build>
-      <!-- Override dependencies to exclude SNAPSHOT versions when releasing -->
+
+      <!-- API-only dependencies - NO Velocity at all -->
       <dependencies>
-        <!-- Exclude Velocity API completely -->
-        <dependency>
-          <groupId>com.velocitypowered</groupId>
-          <artifactId>velocity-api</artifactId>
-          <version>${velocity.api.version}</version>
-          <scope>provided</scope>
-          <optional>true</optional>
-          <exclusions>
-            <exclusion>
-              <groupId>*</groupId>
-              <artifactId>*</artifactId>
-            </exclusion>
-          </exclusions>
-        </dependency>
-        <!-- Keep other dependencies for API -->
-        <dependency>
-          <groupId>dev.dejvokep</groupId>
-          <artifactId>boosted-yaml</artifactId>
-          <version>${boostedyaml.version}</version>
-          <optional>true</optional>
-        </dependency>
-        <dependency>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-          <version>${jackson.databind.version}</version>
-          <optional>true</optional>
-        </dependency>
         <dependency>
           <groupId>net.kyori</groupId>
           <artifactId>adventure-text-minimessage</artifactId>
@@ -235,7 +218,7 @@
     </resources>
 
     <plugins>
-      <!-- Shade the plugin (not the API) -->
+      <!-- Shade the plugin (not the API) - only for normal builds -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
