@@ -77,23 +77,33 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         run: |
-          set -euo pipefail
-          # Read current version
-          POM_VERSION=$(mvn -q -Dexec.executable=echo \
-            -Dexec.args='${project.version}' \
-            --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
-
-          # Make a unique alpha version with commit hash
-          NEW_VERSION="${POM_VERSION}-alpha-${{ steps.meta.outputs.short_sha }}"
-
-          # Update project version and repackage (so the api classifier matches)
-          mvn -B -q versions:set -DnewVersion="${NEW_VERSION}"
-          mvn -B -q -DskipTests package
-
-          # Deploy both main and api classifier to GitHub Packages
-          mvn -B -DskipTests deploy \
-            -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/${{ github.repository }} \
-            -DdeployAtEnd=true
+            set -euo pipefail
+            
+            # Read current version from POM
+            POM_VERSION=$(mvn -q -Dexec.executable=echo \
+              -Dexec.args='${project.version}' \
+              --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
+            
+            SHORT_SHA="${{ steps.meta.outputs.short_sha }}"
+            
+            # Strip common pre-release suffixes before appending our alpha
+            # Examples: 0.9.6-alpha -> 0.9.6 ; 0.9.6-SNAPSHOT -> 0.9.6 ; 0.9.6-rc1 -> 0.9.6
+            BASE_VERSION=$(echo "$POM_VERSION" | sed -E 's/-(alpha|snapshot|SNAPSHOT|rc[0-9]+)$//')
+            
+            NEW_VERSION="${BASE_VERSION}-alpha-${SHORT_SHA}"
+            
+            echo "POM_VERSION=$POM_VERSION"
+            echo "BASE_VERSION=$BASE_VERSION"
+            echo "NEW_VERSION=$NEW_VERSION"
+            
+            # Set and build with the new unique version
+            mvn -B -q versions:set -DnewVersion="${NEW_VERSION}"
+            mvn -B -q -DskipTests package
+            
+            # Deploy using modern alt repo syntax (no ::default)
+            mvn -B -DskipTests deploy \
+              -DaltDeploymentRepository="github::https://maven.pkg.github.com/${{ github.repository }}" \
+              -DdeployAtEnd=true
 
       - name: Deploy release (on GitHub Release)
         if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
