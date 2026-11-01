@@ -1,11 +1,7 @@
-name: Dev Releases (nightly + draft)
+name: Dev Draft Release
 
-# On every push/merge to dev:
-# 1. Refresh the rolling `nightly` GitHub prerelease (plugin + addons)
-# 2. Create an editable draft release pre-filled with commits + jars
-#
-# Plugin alphas still go to Modrinth via modrinth-alpha.yml.
-# Official addons are GitHub-only.
+# On push/merge to dev only: create an editable GitHub release draft
+# pre-filled with commit messages and built jars (plugin + official addons).
 
 on:
   push:
@@ -20,17 +16,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: dev-releases
-  cancel-in-progress: true
+  group: dev-draft-release
+  cancel-in-progress: false
 
 jobs:
-  build:
+  draft:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.meta.outputs.version }}
-      short_sha: ${{ steps.meta.outputs.short_sha }}
-      pom_version: ${{ steps.meta.outputs.pom_version }}
-      tag: ${{ steps.meta.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,7 +57,8 @@ jobs:
             ls -l vpp-plugin/target || true
             exit 1
           fi
-          cp "${CANDIDATES[0]}" "dist/velocitypteropower-${VERSION}.jar"
+          PLUGIN_JAR="dist/velocitypteropower-${VERSION}.jar"
+          cp "${CANDIDATES[0]}" "$PLUGIN_JAR"
 
           stage_jar() {
             local pattern="$1"
@@ -89,107 +81,18 @@ jobs:
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "pom_version=${POM_VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-jars
-          path: |
-            dist/velocitypteropower-*.jar
-            dist/addons/*.jar
-          if-no-files-found: error
-          retention-days: 7
-
-  nightly:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download jars
-        uses: actions/download-artifact@v4
-        with:
-          name: release-jars
-          path: dist
-
-      - name: Publish / refresh nightly release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.build.outputs.version }}
-          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
-        run: |
-          set -euo pipefail
-          # download-artifact preserves directory structure under dist/
-          PLUGIN_JAR=$(ls dist/velocitypteropower-*.jar | head -n1)
-          test -f dist/addons/vpp-addon-webhooks.jar
-          test -f dist/addons/vpp-addon-scheduler.jar
-          test -f dist/addons/vpp-addon-move-history.jar
-
-          NOTES_FILE=$(mktemp)
-          {
-            echo "## Nightly build"
-            echo
-            echo "Always overwritten with the latest successful \`dev\` build."
-            echo
-            echo "- Version: \`${VERSION}\`"
-            echo "- Commit: [\`${SHORT_SHA}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})"
-            echo "- Branch: \`dev\`"
-            echo
-            echo "Plugin alpha is also published to [Modrinth](https://modrinth.com/plugin/velocitypteropower)."
-            echo "Official addons are GitHub-only (drop into \`plugins/VelocityPteroPower/addons/\`)."
-            echo
-            echo "### Commits in this push"
-            if jq -e '.commits | length > 0' "$GITHUB_EVENT_PATH" >/dev/null 2>&1; then
-              jq -r '.commits[] | "- " + .id[0:7] + " " + (.message | gsub("\r?\n"; " ")) + " (" + (.author.username // .author.name // "unknown") + ")"' \
-                "$GITHUB_EVENT_PATH"
-            else
-              git log -5 --pretty=format:'- %h %s (%an)'
-              echo
-            fi
-          } > "$NOTES_FILE"
-
-          gh release delete nightly --yes 2>/dev/null || true
-          git push origin :refs/tags/nightly 2>/dev/null || true
-          git tag -f nightly "$GITHUB_SHA"
-          git push origin nightly --force
-
-          gh release create nightly \
-            --prerelease \
-            --title "Nightly • ${SHORT_SHA}" \
-            --notes-file "$NOTES_FILE" \
-            "$PLUGIN_JAR" \
-            dist/addons/vpp-addon-webhooks.jar \
-            dist/addons/vpp-addon-scheduler.jar \
-            dist/addons/vpp-addon-move-history.jar
-
-  draft:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download jars
-        uses: actions/download-artifact@v4
-        with:
-          name: release-jars
-          path: dist
+          echo "artifact=${PLUGIN_JAR}" >> "$GITHUB_OUTPUT"
 
       - name: Create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.build.outputs.tag }}
-          VERSION: ${{ needs.build.outputs.version }}
-          SHORT_SHA: ${{ needs.build.outputs.short_sha }}
-          POM_VERSION: ${{ needs.build.outputs.pom_version }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+          POM_VERSION: ${{ steps.meta.outputs.pom_version }}
+          PLUGIN_JAR: ${{ steps.meta.outputs.artifact }}
         run: |
           set -euo pipefail
-          PLUGIN_JAR=$(ls dist/velocitypteropower-*.jar | head -n1)
           NOTES_FILE=$(mktemp)
           BEFORE="${{ github.event.before }}"
 

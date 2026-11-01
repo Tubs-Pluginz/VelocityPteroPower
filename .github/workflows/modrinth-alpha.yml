@@ -1,4 +1,8 @@
-name: Modrinth Alpha (every commit)
+name: Modrinth Alpha + Nightly (every commit)
+
+# On every push:
+# - Publish plugin alpha to Modrinth
+# - Refresh the rolling GitHub `nightly` prerelease (plugin + official addons)
 
 on:
   push:
@@ -8,7 +12,7 @@ on:
       - 'README.md'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: modrinth-alpha-${{ github.ref }}
@@ -56,7 +60,7 @@ jobs:
       - name: Build reactor
         run: mvn -B -V -e -DskipTests package -Pdev
 
-      - name: Determine version and rename artifact
+      - name: Determine version and stage jars
         id: meta
         run: |
           set -euo pipefail
@@ -79,13 +83,31 @@ jobs:
             ls -l vpp-plugin/target || true
             exit 1
           fi
-          SRC="${CANDIDATES[0]}"
-          DST="vpp-plugin/target/velocitypteropower-${VERSION}.jar"
-          mv "$SRC" "$DST"
+
+          mkdir -p dist/addons
+          PLUGIN_JAR="dist/velocitypteropower-${VERSION}.jar"
+          cp "${CANDIDATES[0]}" "$PLUGIN_JAR"
+
+          stage_jar() {
+            local pattern="$1"
+            local dest="$2"
+            local files=($pattern)
+            for f in "${files[@]}"; do
+              [[ "$f" == *-original.jar ]] && continue
+              cp "$f" "$dest"
+              echo "Staged $f -> $dest"
+              return 0
+            done
+            echo "Missing jar for $dest (pattern $pattern)" >&2
+            exit 1
+          }
+          stage_jar 'addons/webhooks/target/vpp-addon-webhooks-*.jar' dist/addons/vpp-addon-webhooks.jar
+          stage_jar 'addons/scheduler/target/vpp-addon-scheduler-*.jar' dist/addons/vpp-addon-scheduler.jar
+          stage_jar 'addons/move-history/target/vpp-addon-move-history-*.jar' dist/addons/vpp-addon-move-history.jar
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "artifact=${DST}" >> "$GITHUB_OUTPUT"
+          echo "artifact=${PLUGIN_JAR}" >> "$GITHUB_OUTPUT"
 
       - name: Build alpha changelog text
         id: changelog
@@ -126,3 +148,42 @@ jobs:
             velocity
           game-versions: ${{ steps.versions.outputs.list }}
           java: 25
+
+      - name: Refresh GitHub nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          PLUGIN_JAR="${{ steps.meta.outputs.artifact }}"
+          NOTES_FILE=$(mktemp)
+          {
+            echo "## Nightly build"
+            echo
+            echo "Always overwritten with the latest successful CI build (any branch)."
+            echo
+            echo "- Version: \`${VERSION}\`"
+            echo "- Branch: \`${GITHUB_REF_NAME}\`"
+            echo "- Commit: [\`${SHORT_SHA}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})"
+            echo
+            echo "Plugin alpha is also on [Modrinth](https://modrinth.com/plugin/velocitypteropower)."
+            echo "Official addons are GitHub-only (drop into \`plugins/VelocityPteroPower/addons/\`)."
+            echo
+            echo "### Commits in this push"
+            cat changelog.md
+          } > "$NOTES_FILE"
+
+          gh release delete nightly --yes 2>/dev/null || true
+          git push origin :refs/tags/nightly 2>/dev/null || true
+          git tag -f nightly "$GITHUB_SHA"
+          git push origin nightly --force
+
+          gh release create nightly \
+            --prerelease \
+            --title "Nightly • ${SHORT_SHA} (${GITHUB_REF_NAME})" \
+            --notes-file "$NOTES_FILE" \
+            "$PLUGIN_JAR" \
+            dist/addons/vpp-addon-webhooks.jar \
+            dist/addons/vpp-addon-scheduler.jar \
+            dist/addons/vpp-addon-move-history.jar
