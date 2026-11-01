@@ -2,7 +2,7 @@ name: Modrinth Alpha (every commit)
 
 on:
   push:
-    branches: ['**'] # every branch
+    branches: ['**']
     paths-ignore:
       - 'workflows/**'
       - 'README.md'
@@ -22,17 +22,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # needed for branch history/tags in changelog
+          fetch-depth: 0
 
-      - name: Setup JDK 21
+      - name: Setup JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
+          cache: maven
 
-      - name: Build with Maven (shade)
+      - name: Detect changed addons
+        id: changes
         run: |
-          mvn -B -V -e -DskipTests package -P dev
+          set -euo pipefail
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+          fi
+          if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            DIFF=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" || true)
+          else
+            DIFF=$(git ls-files)
+          fi
+          echo "$DIFF" | head -200
+          api_changed=false
+          echo "$DIFF" | grep -qE '^vpp-api/' && api_changed=true || true
+          webhooks=false
+          scheduler=false
+          move_history=false
+          if $api_changed || echo "$DIFF" | grep -qE '^addons/webhooks/'; then webhooks=true; fi
+          if $api_changed || echo "$DIFF" | grep -qE '^addons/scheduler/'; then scheduler=true; fi
+          if $api_changed || echo "$DIFF" | grep -qE '^addons/move-history/'; then move_history=true; fi
+          echo "webhooks=$webhooks" >> "$GITHUB_OUTPUT"
+          echo "scheduler=$scheduler" >> "$GITHUB_OUTPUT"
+          echo "move_history=$move_history" >> "$GITHUB_OUTPUT"
+          echo "api_changed=$api_changed" >> "$GITHUB_OUTPUT"
+
+      - name: Build reactor
+        run: mvn -B -V -e -DskipTests package -Pdev
 
       - name: Determine version and rename artifact
         id: meta
@@ -44,69 +71,79 @@ jobs:
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
           VERSION="${POM_VERSION}-${SHORT_SHA}"
 
-          # Prefer shaded jar; fall back to any non-original matching jar
           shopt -s nullglob
-          CANDIDATES=(target/velocitypteropower-*-shaded.jar)
+          CANDIDATES=(vpp-plugin/target/velocitypteropower-*-shaded.jar)
           if [ ${#CANDIDATES[@]} -lt 1 ]; then
-            FILES=(target/velocitypteropower-*.jar)
+            FILES=(vpp-plugin/target/velocitypteropower-*.jar)
             FILTERED=()
             for f in "${FILES[@]}"; do [[ "$f" != *-original.jar ]] && FILTERED+=("$f"); done
             CANDIDATES=("${FILTERED[@]}")
           fi
           if [ ${#CANDIDATES[@]} -lt 1 ]; then
-            echo "No suitable JARs found in target directory"
-            ls -l target || true
+            echo "No suitable JARs found in vpp-plugin/target directory"
+            ls -l vpp-plugin/target || true
             exit 1
           fi
           SRC="${CANDIDATES[0]}"
-          DST="target/velocitypteropower-${VERSION}.jar"
+          DST="vpp-plugin/target/velocitypteropower-${VERSION}.jar"
           mv "$SRC" "$DST"
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "artifact=${DST}" >> "$GITHUB_OUTPUT"
 
+          mkdir -p dist/addons
+          stage_jar() {
+            local pattern="$1"
+            local dest="$2"
+            shopt -s nullglob
+            local files=($pattern)
+            for f in "${files[@]}"; do
+              [[ "$f" == *-original.jar ]] && continue
+              cp "$f" "$dest"
+              return 0
+            done
+            return 1
+          }
+          stage_jar 'addons/webhooks/target/vpp-addon-webhooks-*.jar' dist/addons/vpp-addon-webhooks.jar || true
+          stage_jar 'addons/scheduler/target/vpp-addon-scheduler-*.jar' dist/addons/vpp-addon-scheduler.jar || true
+          stage_jar 'addons/move-history/target/vpp-addon-move-history-*.jar' dist/addons/vpp-addon-move-history.jar || true
+
       - name: Build alpha changelog text
         id: changelog
         run: |
           set -euo pipefail
           {
-            echo "## ⚠️ Alpha build for branch: ${GITHUB_REF_NAME}"
+            echo "## Alpha build for branch: ${GITHUB_REF_NAME}"
             echo
-            echo "> This build is generated automatically on every commit and may be unstable or untested."
-            echo "> Need help? Join the Discord: https://discord.pluginz.dev"
+            echo "> Automatic build; may be unstable."
+            echo "> Discord: https://discord.pluginz.dev"
             echo
-            echo "### What's in testing (commits in this push)"
+            echo "### Commits in this push"
             jq -r '.commits[] | "- " + .id[0:7] + " " + (.message | gsub("\r?\n"; " ")) + " (" + (.author.username // .author.name // "unknown") + ")"' \
               "$GITHUB_EVENT_PATH" || true
             echo
             echo "### Links"
-            echo "- Branch history: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
-            echo "- This commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
-            echo "- Compare (last 20): https://github.com/${GITHUB_REPOSITORY}/compare/${GITHUB_REF_NAME}~20...${GITHUB_REF_NAME}"
+            echo "- Branch: https://github.com/${GITHUB_REPOSITORY}/commits/${GITHUB_REF_NAME}"
+            echo "- Commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
           } > changelog.md
-
-          # Use EOF delimiter for clean multiline GitHub output
           {
             echo 'text<<EOF'
             cat changelog.md
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
-      - name: Publish to Modrinth (alpha)
+      - name: Publish plugin to Modrinth (alpha)
         uses: WiIIiam278/mc-publish@hangar
         with:
           modrinth-id: 1dDr5J4w
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           modrinth-featured: false
-
-          files-primary: ${{ steps.meta.outputs.artifact }}
-
+          files: ${{ steps.meta.outputs.artifact }}
           name: VelocityPteroPower Alpha • ${{ steps.meta.outputs.short_sha }}
           version: ${{ steps.meta.outputs.version }}
           version-type: alpha
           changelog: ${{ steps.changelog.outputs.text }}
-
           loaders: |
             velocity
           game-versions: |
@@ -155,4 +192,49 @@ jobs:
             1.21.8
             1.21.9
             1.21.10
-          java: 21
+          java: 25
+
+      - name: Publish webhooks addon (alpha)
+        if: steps.changes.outputs.webhooks == 'true'
+        uses: WiIIiam278/mc-publish@hangar
+        with:
+          modrinth-id: 3UKAAshD
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: dist/addons/vpp-addon-webhooks.jar
+          name: VPP Webhooks Alpha • ${{ steps.meta.outputs.short_sha }}
+          version: ${{ steps.meta.outputs.version }}
+          version-type: alpha
+          changelog: ${{ steps.changelog.outputs.text }}
+          loaders: |
+            velocity
+          java: 25
+
+      - name: Publish scheduler addon (alpha)
+        if: steps.changes.outputs.scheduler == 'true'
+        uses: WiIIiam278/mc-publish@hangar
+        with:
+          modrinth-id: ZfIvLQ4D
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: dist/addons/vpp-addon-scheduler.jar
+          name: VPP Scheduler Alpha • ${{ steps.meta.outputs.short_sha }}
+          version: ${{ steps.meta.outputs.version }}
+          version-type: alpha
+          changelog: ${{ steps.changelog.outputs.text }}
+          loaders: |
+            velocity
+          java: 25
+
+      - name: Publish move-history addon (alpha)
+        if: steps.changes.outputs.move_history == 'true'
+        uses: WiIIiam278/mc-publish@hangar
+        with:
+          modrinth-id: KGDp7TnL
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: dist/addons/vpp-addon-move-history.jar
+          name: VPP Move History Alpha • ${{ steps.meta.outputs.short_sha }}
+          version: ${{ steps.meta.outputs.version }}
+          version-type: alpha
+          changelog: ${{ steps.changelog.outputs.text }}
+          loaders: |
+            velocity
+          java: 25
