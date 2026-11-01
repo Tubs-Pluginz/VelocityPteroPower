@@ -1,0 +1,419 @@
+################################
+#      VelocityPteroPower      #
+#         by TubYoub            #
+################################
+
+# Version of the configuration file
+fileversion: 17
+
+# Check for updates
+# If true, the plugin will check for updates on startup.
+# If a new version is available, a message will be sent to the console and to players with the permission "ptero.reload".
+checkUpdate: true
+
+# Override the language used for plugin messages.
+# Set to a locale like "en_US" or "de_DE" to force a specific language.
+# Use "auto" to follow the environment (system/Velocity) language.
+# default: auto
+languageOverride: auto
+
+# Choose which logging level should be used
+# It depends on how much you want you're console to be filled with information from VPP
+# For production you can safely set it to a higher level but for development/testing it is recommended to use a lower level
+# 10 = Debug
+# 20 = Info
+# 30 = Warning
+# 40 = Error
+#default: 20
+loggerLevel: 20
+
+# How many threads the API client should use for HTTP work.
+# VPP auto-scales threads to roughly 2x the number of configured servers (clamped between 4 and 64).
+# If you set apiThreads higher than that baseline, your configured value overrides the baseline.
+# More threads = more parallel requests but also more resource usage. Restart/reload to apply.
+# default: 10
+apiThreads: 10
+
+# print updated Rate Limit from the API response to console
+# default: false
+printRateLimit: false
+
+# Choose the method to check if a managed server is online and ready.
+# "VELOCITY_PING": Uses Velocity's built-in ping functionality. Requires the server
+#                  to be registered in Velocity's config and accessible from the proxy.
+#                  Less resource-intensive, doesn't use API rate limits. Might report
+#                  online slightly before the server is fully joinable.
+#                  Some simple Limbo servers might not report any Ping back suing this method.
+# "PANEL_API": Uses the panel API (Pterodactyl/Pelican/Calagopus) to check the server's state.
+#                    More accurate for actual server state ("running"), but uses API
+#                    requests and counts towards rate limits.
+# "HYBRID": Requires both panel "running" AND a successful Velocity ping before treating
+#           the server as ready (best for avoiding premature joins / kicks).
+# Default: "HYBRID"
+serverStatusCheckMethod: "HYBRID"
+
+# How long the ping to the server lasts, to check if its is online, until it times out (in milliseconds)
+# default: 1000 (1 second)
+pingTimeout: 1000
+
+# How many retrys to shut down the server if the previous one failed
+# default: 3
+shutdownRetries: 3
+
+# How long to wait before retrying to shut down the server (in seconds)
+# default: 300
+shutdownRetryDelay: 300
+
+# How long to wait before shutting down the server if no player joined the server(in seconds)
+# default: 300
+# -1 = disabled
+idleStartShutdownTime: 300
+
+# How long to wait before allowing a player to start a server again (in seconds)
+# default: 10
+playerStartCooldown: 10
+
+# How long (in seconds) the plugin should wait for the first check if the server is online
+# Maybe consider changing this to a lower value if you have for example a
+# limbo which is lightweight and starts fast
+# default: 10
+startupInitialCheckDelay: 10
+
+# How often (in seconds) to poll while waiting for a server to come online.
+# Independent of startupJoinDelay (which is the post-online settle delay).
+# default: 5
+startupPollInterval: 5
+
+# Maximum time (in seconds) to wait for a server to become online after a start signal.
+# default: 180
+startupTimeoutSeconds: 180
+
+# What to do when startupTimeoutSeconds elapses:
+# CANCEL         → clear waiters and starting state (default)
+# KEEP_STARTING  → clear player waiters but leave starting state so they can re-queue
+# default: CANCEL
+startupTimeoutPolicy: CANCEL
+
+# After an auto-connect transfer, if the backend kicks with SERVER_DISCONNECTED within this
+# many seconds, soft-requeue the player (settle again) instead of cancelling.
+# default: 30
+softRequeueGraceSeconds: 30
+
+# Max soft-requeue attempts after premature kicks during start-wait transfers.
+# default: 3
+softRequeueMaxAttempts: 3
+
+# Pause background prefetch when remaining API requests fall to this threshold (or waiters exist).
+# default: 5
+rateLimitBackgroundPauseThreshold: 5
+
+# If the panel never sends X-RateLimit-Reset, wait this many seconds before probing again when remaining is 0.
+# default: 60
+rateLimitProbeFallbackSeconds: 60
+
+# Persist start-wait queues to disk so players can resume after reconnect.
+# default: true
+persistentQueueEnabled: true
+
+# How long (seconds) a disconnected player's queue entry remains valid.
+# default: 900 (15 minutes)
+persistentQueueTtlSeconds: 900
+
+# Subscribe to Pterodactyl/Pelican/Calagopus Wings websockets for live server state (reduces polling).
+# default: true
+panelWebSocketEnabled: true
+
+# How often to (re)ensure websocket subscriptions for managed servers.
+# default: 120
+panelWebSocketRefreshSeconds: 120
+
+# TTL for cached live panel states from websocket (seconds).
+# default: 30
+serverStateCacheTtlSeconds: 30
+
+# Reserve this many online slots for always-online / limbo / lobby so player starts cannot fill the entire cap.
+# Only applies when maxOnlineServers > 0. default: 0
+maxOnlineReservations: 0
+
+# When max online is reached, queue the player for the target instead of hard-denying (start-on-join).
+# default: true
+queueWhenMaxOnline: true
+
+# Servers to ignore when the stopIdle command is used
+# THIS DOES NOT AFFECT forceStop
+stopIdleIgnore:
+  - hub
+  - lobby
+  - limbo
+
+# If a player should receive a message when a server is not found in the config
+# message will always be send to console
+# default: false
+serverNotFoundMessage: false
+
+# Allow players with the permission "ptero.bypass" to bypass the whitelist when starting a server.
+# This does not work to get around a whitelist because it is enforced by the backend server itself.
+# default: true
+whitelistAllowBypass: true
+
+# How long (in minutes) VPP should wait in between checks for a new whitelist and enforce it (if enabled)
+# default: 10
+whitelistCheckInterval: 10
+
+# Limit how many managed servers may be online concurrently. 0 = unlimited
+# default = 0
+maxOnlineServers: 0
+
+# Allow players with the permission "ptero.maxcap.bypass" to bypass the maxOnlineServers cap when starting servers.
+# default: true
+maxOnlineAllowBypass: true
+
+# Servers excluded from the above cap (by Velocity server name)
+maxOnlineExempt:
+  - hub
+  - lobby
+  - limbo
+
+# Whether to include lobbyBalancer lobbies in the maxOnlineServers count
+# default: false
+countLobbiesInMaxOnline: false
+
+# Whether to include lobbyBalancer limbos in the maxOnlineServers count
+# default: false
+countLimbosInMaxOnline: false
+
+# Servers that should always be kept online. The plugin will periodically check and start them if offline.
+alwaysOnline:
+  - limbo
+
+# How often to check/enforce the alwaysOnline list (in seconds)
+# default = 60
+alwaysOnlineCheckInterval: 60
+
+# Resource usage caching for panel queries
+# How long to cache resource usage responses (in seconds). Set to 0 to disable caching.
+# default = 10
+resourceCacheSeconds: 10
+
+# If enabled, the plugin will periodically prefetch resource usage for all managed servers
+# every 'resourceCacheSeconds' to keep the cache warm and make commands snappy.
+# default = true
+resourcePrefetchEnabled: true
+
+# Automatic idle shutdown sweep (failsafe)
+# Periodically checks all managed servers and schedules idle shutdowns if they are empty.
+# This safeguards against missed events or errors preventing scheduling.
+# Set to 0 or negative to disable.
+# default = 60
+idleShutdownCheckInterval: 60
+
+# In-memory player move history (server switch history)
+# Pretty display command: /ptero history [player]
+# Data is NOT saved to disk; only kept while the proxy is running
+moveHistory:
+  enabled: false
+  # Maximum number of recent moves to retain per player (latest first)
+  maxEntriesPerPlayer: 50
+
+# Maintenance cold-start gate
+# VPP always ships its own /ptero maintenance mode. Networks that already run
+# kennytv/Maintenance (or an addon that registers MaintenanceProvider) can keep
+# both, or disable either side independently.
+maintenance:
+  # Built-in VPP maintenance (/ptero maintenance [server|global] on|off)
+  # default = true
+  builtinEnabled: true
+  # External providers: auto-detect kennytv/Maintenance + addon SPI registrations
+  # via VPPApi.registerMaintenanceProvider(...)
+  # default = true
+  externalProvidersEnabled: true
+
+# Lifecycle related behavior
+lifecycle:
+  # When the proxy shuts down, stop these servers.
+  # Use "all" to stop all managed servers, or provide a list of specific server names.
+  # This overrides 'alwaysOnline' during shutdown.
+  # Leave the list empty to disable stopping servers on proxy shutdown (default behavior).
+  # To stop all managed servers on shutdown, set:
+  #   shutdownOnProxyExit:
+  #     - all
+  # Or list specific servers by name.
+  shutdownOnProxyExit: []
+
+# Multi-lobby/limbo balancer settings
+lobbyBalancer:
+  # Enable the built-in balancer logic provided by VPP. If you plan to use an external addon that registers a RoutingProvider,
+  # you can set this to false to disable the built-in balancer entirely. Routing providers do NOT automatically disable the
+  # built-in balancer; providers run first and VPP falls back to the built-in balancer if this is true.
+  enableBuiltin: true
+
+  # A list of lobby servers to use for player transfers and first-join routing (if you route players there).
+  # Order matters if lobbiesToUse is set; only the first N will be considered active.
+  lobbies:
+    - lobby
+    # - hub  # optional: add additional lobby servers here if configured under servers
+
+  # Optional list of limbo servers to use while target servers are starting.
+  limbos:
+    - limbo
+
+  # How many lobbies from the list above should be considered for balancing (0 = use all listed)
+  # default = 0
+  lobbiesToUse: 0
+
+  # Balancer strategy: ROUND_ROBIN, LEAST_PLAYERS, or LEAST_CPU
+  # default = ROUND_ROBIN
+  strategy: "ROUND_ROBIN"
+
+  # Periodic health check interval in seconds for verifying reachability and planning scale-ups
+  # default = 15
+  healthCheckInterval: 15
+
+  # Keep at least this many lobby servers online (0 = no minimum)
+  # default = 1
+  minOnline: 1
+
+  # Do not keep more than this many lobby servers online (0 = unlimited)
+  # default = 0
+  maxOnline: 0
+
+  # Approximate players-per-lobby capacity used to decide when to scale up
+  # default = 80
+  playersPerServer: 80
+
+  # Only used with LEAST_CPU strategy. If any lobby exceeds this CPU percent, consider scaling up
+  # default = 85.0
+  cpuScaleUpThreshold: 85.0
+
+  # If true, balancer will auto-start additional lobbies when needed
+  # default = true
+  autoScaleEnabled: true
+
+  # Start another lobby before capacity is completely full.
+  # When total players across online lobbies reach this percent of capacity, VPP starts another lobby (if available).
+  # default = 80 (means start a new lobby at ~80% of total lobby capacity)
+  preStartThresholdPercent: 80
+
+  # If a lobby was started but doesn't come online within this many seconds, VPP will try starting a different lobby.
+  # default = 60
+  startFailureFallbackSeconds: 60
+
+  # After a failed start, wait this many seconds before trying that same lobby again.
+  # default = 120
+  startFailureCooldownSeconds: 120
+
+  # Scale down empty extra lobbies back toward minOnline after they have been idle.
+  # default = true
+  scaleDownEnabled: true
+
+  # How long (seconds) an empty lobby above minOnline must stay empty before stop.
+  # default = 300
+  scaleDownIdleSeconds: 300
+
+  # When a target server is starting, send players to a limbo (if available) and auto-queue them.
+  # Falls back to a configured lobby when no limbo is reachable.
+  # If false, players will stay on their current server (or be disconnected if coming from proxy) while queued.
+  # default = true when lobbyBalancer.limbos is non-empty; otherwise false
+  sendToLimboOnStart: true
+
+  # Behavior for forced-host joins when the target backend is offline
+  # DISCONNECT       → disconnect (default)
+  # LOBBY_OR_LIMBO  → try a lobby first, then a limbo; if none, disconnect
+  # LIMBO_ONLY      → only try limbo; if none, disconnect
+  forcedHostOfflineBehavior: LOBBY_OR_LIMBO
+
+# Panel configuration
+pterodactyl:
+  # The URL of your panel (Pterodactyl / Pelican / Calagopus)
+  # If you use Cloudflare Tunnel, you need to allow the ip in the bypass setting.
+  url: "https://panel.example.com"
+  # The client API key of your panel.
+  # Supported prefixes: "ptlc_" (Pterodactyl), "plcn_"/"pacc_" (Pelican), "c7sp_" (Calagopus).
+  # Find it under Account → API Credentials / API Keys.
+  # Calagopus: grant control.start/stop/restart + files.read-content for power/status/whitelist.
+  apiKey: "ptlc_000000000000000000000000000000000000000000"
+
+# Per server configuration
+# Make sure that the server names match the registered servers in the velocity.toml
+servers:
+  #server name
+  example:
+
+    # Panel server ID
+    # You can find the Panel server ID in the URL of the server page.
+    # For example, if the URL is https://panel.example.com/server/1234abcd, the server ID is 1234abcd.
+    # For Pelican, you need the short UUID from Server Details.
+    # For Calagopus, use the full server UUID from the server URL / details page.
+    # IMPORTANT: Always quote the ID to prevent YAML from parsing it as a number (e.g., 91e62747 would become Infinity if unquoted)
+
+    id: "1234abcd"
+
+    # The time in seconds to stop the server after the last player leaves.
+    # If you don't want to stop the server automatically, set it to -1.
+    # If you set it to 0, the server will be stopped immediately after the last player leaves.
+
+    timeout: 30
+
+    # The time (in seconds) VPP should wait AFTER the server is online before auto-connecting.
+# Useful when plugins need a few seconds to finish loading after ping/API reports ready.
+    startupJoinDelay: 10
+
+    # Optional: shared group name. Starting one member also starts offline peers;
+    # idle-shutdown is skipped while any group member still has players.
+    # group: "minigames"
+
+    # Optional: explicitly linked servers also started with this one (even across groups).
+    # linkedServers:
+    #   - skywars-db
+
+    # Optional: single-use start password (alternative to whitelist). Players unlock with
+    # /ptero unlock <server> <password>; the password is consumed after one successful unlock.
+    # startPassword: "change-me"
+
+    # Optional overrides (omit to use global defaults):
+    # startupPollInterval: 5
+    # startupTimeoutSeconds: 180
+    # serverStatusCheckMethod: HYBRID
+    # profile: survival
+
+    # If VPP should fetch the whitelist of the Server and enforce it when a player trys to start a server
+    # default: false
+    whitelist: false
+
+# Optional named profiles — servers can set profile: <name> and override individual fields.
+# profiles:
+#   survival:
+#     startupJoinDelay: 15
+#     startupTimeoutSeconds: 300
+#     serverStatusCheckMethod: HYBRID
+#   limbo:
+#     startupJoinDelay: 0
+#     startupPollInterval: 3
+#     serverStatusCheckMethod: PANEL_API
+#     timeout: -1
+
+# Optional explicit server groups (merged with per-server group:).
+# Starting any member also starts offline peers; idle-shutdown waits for the whole group.
+# serverGroups:
+#   minigames:
+#     - skywars
+#     - bedwars
+
+# VPP-managed addons (JARs under plugins/VelocityPteroPower/addons/)
+addons:
+  # Official catalog (GitHub raw). Operators can extend it with extraCatalogUrls / extraEntries.
+  catalogUrl: "https://raw.githubusercontent.com/Tubs-Pluginz/VelocityPteroPower/dev/catalog/addons.json"
+  # Additional catalog JSON URLs (same schema as catalog/addons.json)
+  extraCatalogUrls: []
+  # Inline catalog entries for one-off / private addons
+  # extraEntries:
+  #   - id: my-addon
+  #     name: My Addon
+  #     description: Private addon
+  #     authors: ["You"]
+  #     latestVersion: "1.0.0"
+  #     downloadUrl: "https://example.com/my-addon-1.0.0.jar"
+  #     apiVersion: "1.0.0"
+  extraEntries: []
+  # Load enabled addon JARs automatically on proxy start
+  autoLoadOnStartup: true
