@@ -46,7 +46,7 @@ jobs:
       - name: Build plugin and official addons
         run: mvn -B -V -e -DskipTests package -Pbeta
 
-      - name: Determine version and stage addon jars
+      - name: Determine version and stage jars
         id: meta
         run: |
           set -euo pipefail
@@ -63,6 +63,9 @@ jobs:
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           ARTIFACT=$(ls vpp-plugin/target/velocitypteropower-*-shaded.jar | head -n1)
           echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
+
+          mkdir -p dist
+          cp "$ARTIFACT" "dist/velocitypteropower-${VERSION}.jar"
 
           mkdir -p dist/addons
           stage_jar() {
@@ -99,59 +102,16 @@ jobs:
           game-versions: ${{ steps.versions.outputs.list }}
           java: 25
 
-      - name: Publish webhooks addon
-        uses: WiIIiam278/mc-publish@hangar
-        with:
-          modrinth-id: 3UKAAshD
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/addons/vpp-addon-webhooks.jar
-          name: VPP Webhooks v${{ steps.meta.outputs.version }}
-          version: ${{ steps.meta.outputs.version }}
-          version-type: beta
-          changelog: ${{ github.event.release.body || 'Official VPP webhooks addon' }}
-          loaders: |
-            velocity
-          game-versions: ${{ steps.versions.outputs.list }}
-          java: 25
-
-      - name: Publish scheduler addon
-        uses: WiIIiam278/mc-publish@hangar
-        with:
-          modrinth-id: ZfIvLQ4D
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/addons/vpp-addon-scheduler.jar
-          name: VPP Scheduler v${{ steps.meta.outputs.version }}
-          version: ${{ steps.meta.outputs.version }}
-          version-type: beta
-          changelog: ${{ github.event.release.body || 'Official VPP scheduler addon' }}
-          loaders: |
-            velocity
-          game-versions: ${{ steps.versions.outputs.list }}
-          java: 25
-
-      - name: Publish move-history addon
-        uses: WiIIiam278/mc-publish@hangar
-        with:
-          modrinth-id: KGDp7TnL
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/addons/vpp-addon-move-history.jar
-          name: VPP Move History v${{ steps.meta.outputs.version }}
-          version: ${{ steps.meta.outputs.version }}
-          version-type: beta
-          changelog: ${{ github.event.release.body || 'Official VPP move-history addon' }}
-          loaders: |
-            velocity
-          game-versions: ${{ steps.versions.outputs.list }}
-          java: 25
-
-      - name: Upload addon jars to GitHub Release
+      - name: Upload jars to GitHub Release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           TAG="${{ github.event.release.tag_name }}"
+          VERSION="${{ steps.meta.outputs.version }}"
           gh release upload "$TAG" \
+            "dist/velocitypteropower-${VERSION}.jar" \
             dist/addons/vpp-addon-webhooks.jar \
             dist/addons/vpp-addon-scheduler.jar \
             dist/addons/vpp-addon-move-history.jar \

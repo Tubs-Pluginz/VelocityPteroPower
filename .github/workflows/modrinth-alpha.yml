@@ -53,33 +53,6 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
-      - name: Detect changed addons
-        id: changes
-        run: |
-          set -euo pipefail
-          BEFORE="${{ github.event.before }}"
-          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "")
-          fi
-          if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            DIFF=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" || true)
-          else
-            DIFF=$(git ls-files)
-          fi
-          echo "$DIFF" | head -200
-          api_changed=false
-          echo "$DIFF" | grep -qE '^vpp-api/' && api_changed=true || true
-          webhooks=false
-          scheduler=false
-          move_history=false
-          if $api_changed || echo "$DIFF" | grep -qE '^addons/webhooks/'; then webhooks=true; fi
-          if $api_changed || echo "$DIFF" | grep -qE '^addons/scheduler/'; then scheduler=true; fi
-          if $api_changed || echo "$DIFF" | grep -qE '^addons/move-history/'; then move_history=true; fi
-          echo "webhooks=$webhooks" >> "$GITHUB_OUTPUT"
-          echo "scheduler=$scheduler" >> "$GITHUB_OUTPUT"
-          echo "move_history=$move_history" >> "$GITHUB_OUTPUT"
-          echo "api_changed=$api_changed" >> "$GITHUB_OUTPUT"
-
       - name: Build reactor
         run: mvn -B -V -e -DskipTests package -Pdev
 
@@ -114,23 +87,6 @@ jobs:
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "artifact=${DST}" >> "$GITHUB_OUTPUT"
 
-          mkdir -p dist/addons
-          stage_jar() {
-            local pattern="$1"
-            local dest="$2"
-            shopt -s nullglob
-            local files=($pattern)
-            for f in "${files[@]}"; do
-              [[ "$f" == *-original.jar ]] && continue
-              cp "$f" "$dest"
-              return 0
-            done
-            return 1
-          }
-          stage_jar 'addons/webhooks/target/vpp-addon-webhooks-*.jar' dist/addons/vpp-addon-webhooks.jar || true
-          stage_jar 'addons/scheduler/target/vpp-addon-scheduler-*.jar' dist/addons/vpp-addon-scheduler.jar || true
-          stage_jar 'addons/move-history/target/vpp-addon-move-history-*.jar' dist/addons/vpp-addon-move-history.jar || true
-
       - name: Build alpha changelog text
         id: changelog
         run: |
@@ -163,54 +119,6 @@ jobs:
           modrinth-featured: false
           files: ${{ steps.meta.outputs.artifact }}
           name: VelocityPteroPower Alpha • ${{ steps.meta.outputs.short_sha }}
-          version: ${{ steps.meta.outputs.version }}
-          version-type: alpha
-          changelog: ${{ steps.changelog.outputs.text }}
-          loaders: |
-            velocity
-          game-versions: ${{ steps.versions.outputs.list }}
-          java: 25
-
-      - name: Publish webhooks addon (alpha)
-        if: steps.changes.outputs.webhooks == 'true'
-        uses: WiIIiam278/mc-publish@hangar
-        with:
-          modrinth-id: 3UKAAshD
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/addons/vpp-addon-webhooks.jar
-          name: VPP Webhooks Alpha • ${{ steps.meta.outputs.short_sha }}
-          version: ${{ steps.meta.outputs.version }}
-          version-type: alpha
-          changelog: ${{ steps.changelog.outputs.text }}
-          loaders: |
-            velocity
-          game-versions: ${{ steps.versions.outputs.list }}
-          java: 25
-
-      - name: Publish scheduler addon (alpha)
-        if: steps.changes.outputs.scheduler == 'true'
-        uses: WiIIiam278/mc-publish@hangar
-        with:
-          modrinth-id: ZfIvLQ4D
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/addons/vpp-addon-scheduler.jar
-          name: VPP Scheduler Alpha • ${{ steps.meta.outputs.short_sha }}
-          version: ${{ steps.meta.outputs.version }}
-          version-type: alpha
-          changelog: ${{ steps.changelog.outputs.text }}
-          loaders: |
-            velocity
-          game-versions: ${{ steps.versions.outputs.list }}
-          java: 25
-
-      - name: Publish move-history addon (alpha)
-        if: steps.changes.outputs.move_history == 'true'
-        uses: WiIIiam278/mc-publish@hangar
-        with:
-          modrinth-id: KGDp7TnL
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: dist/addons/vpp-addon-move-history.jar
-          name: VPP Move History Alpha • ${{ steps.meta.outputs.short_sha }}
           version: ${{ steps.meta.outputs.version }}
           version-type: alpha
           changelog: ${{ steps.changelog.outputs.text }}
