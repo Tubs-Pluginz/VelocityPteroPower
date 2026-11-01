@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.tubyoub</groupId>
+    <artifactId>velocitypteropower-parent</artifactId>
+    <version>0.9.6-alpha</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>vpp-addon-sample</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+  <name>VPP Sample Addon</name>
+  <description>Example VPP-managed addon demonstrating the public API</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>de.tubyoub</groupId>
+      <artifactId>vpp-api</artifactId>
+      <version>${project.parent.version}</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifestEntries>
+              <VPP-Addon-Id>vpp-sample</VPP-Addon-Id>
+              <VPP-Addon-Version>${project.version}</VPP-Addon-Version>
+            </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

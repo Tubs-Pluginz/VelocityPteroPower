@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "addons": [
+    {
+      "id": "vpp-sample",
+      "name": "VPP Sample Addon",
+      "description": "Demo commands, config, events and routing for addon authors (build locally; not published)",
+      "authors": ["TubYoub"],
+      "latestVersion": "1.0.0",
+      "downloadUrl": "",
+      "homepage": "https://github.com/Tubs-Pluginz/VelocityPteroPower/tree/dev/addons/sample",
+      "apiVersion": "1.0.0"
+    },
+    {
+      "id": "vpp-webhooks",
+      "name": "VPP Webhooks",
+      "description": "Discord and generic webhook notifications for power and connect events",
+      "authors": ["TubYoub"],
+      "latestVersion": "1.0.0",
+      "downloadUrl": "https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/latest/download/vpp-addon-webhooks.jar",
+      "homepage": "https://modrinth.com/project/3UKAAshD",
+      "apiVersion": "1.0.0"
+    },
+    {
+      "id": "vpp-scheduler",
+      "name": "VPP Scheduler",
+      "description": "Cron-based scheduled start/stop for managed servers",
+      "authors": ["TubYoub"],
+      "latestVersion": "1.0.0",
+      "downloadUrl": "https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/latest/download/vpp-addon-scheduler.jar",
+      "homepage": "https://modrinth.com/project/ZfIvLQ4D",
+      "apiVersion": "1.0.0"
+    },
+    {
+      "id": "vpp-move-history",
+      "name": "VPP Move History",
+      "description": "Persistent move/connect audit history with moderation tools",
+      "authors": ["TubYoub"],
+      "latestVersion": "1.0.0",
+      "downloadUrl": "https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/latest/download/vpp-addon-move-history.jar",
+      "homepage": "https://modrinth.com/project/KGDp7TnL",
+      "apiVersion": "1.0.0"
+    }
+  ]
+}

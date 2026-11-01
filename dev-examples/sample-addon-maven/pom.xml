@@ -7,23 +7,21 @@
     <groupId>dev.example</groupId>
     <artifactId>vpp-addon-sample</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>VPP Addon Sample</name>
-    <description>Minimal example Velocity plugin that integrates with VelocityPteroPower's public API</description>
+    <name>VPP Addon Sample (legacy Velocity-plugin style)</name>
+    <description>Legacy example that embeds the VPP API inside a Velocity plugin. Prefer addons/sample for new work.</description>
     <packaging>jar</packaging>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <maven.compiler.release>21</maven.compiler.release>
-        <velocity.api.version>3.5.0-20260708.093050-39</velocity.api.version>
-        <vpp.version>0.9.6</vpp.version>
-        <!-- Path to the locally built API jar (when building inside this repo) -->
-        <vpp.local.api.jar>${project.basedir}/../../target/velocitypteropower-${vpp.version}-api.jar</vpp.local.api.jar>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
+        <velocity.api.version>4.3.0</velocity.api.version>
+        <vpp.api.version>0.9.6-alpha</vpp.api.version>
+        <vpp.local.api.jar>${project.basedir}/../../vpp-api/target/vpp-api-${vpp.api.version}.jar</vpp.local.api.jar>
     </properties>
 
     <repositories>
-        <!-- Velocity API -->
         <repository>
             <id>papermc-repo</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
@@ -32,12 +30,10 @@
             <id>github</id>
             <name>GitHub Packages</name>
             <url>https://maven.pkg.github.com/Tubs-Pluginz/VelocityPteroPower</url>
-          </repository>
+        </repository>
     </repositories>
 
-
     <dependencies>
-        <!-- Velocity API at compile-time only -->
         <dependency>
             <groupId>com.velocitypowered</groupId>
             <artifactId>velocity-api</artifactId>
@@ -47,9 +43,11 @@
     </dependencies>
 
     <!--
-      Dependency on the VPP API is handled via profiles:
-      - use-local-api-jar: activated when the local slim API jar exists under ../../../target
-      - use-installed-vpp-api: active by default, expects the API classifier to be present in ~/.m2 (run `mvn install` in the VPP root)
+      Prefer the in-repo VPP-managed addon: ../../addons/sample
+      This example still builds as a Velocity plugin that consumes vpp-api.
+      Profiles:
+        - use-local-api-jar: when ../../vpp-api/target/vpp-api-*.jar exists (run mvn -pl vpp-api package first)
+        - use-installed-vpp-api: after mvn -pl vpp-api install
     -->
     <profiles>
         <profile>
@@ -61,11 +59,11 @@
             </activation>
             <dependencies>
                 <dependency>
-                  <groupId>de.tubyoub</groupId>
-                  <artifactId>velocitypteropower</artifactId>
-                  <version>0.9.6-alpha-4aca5fa</version>
-                  <classifier>api</classifier>
-                  <scope>provided</scope>
+                    <groupId>de.tubyoub</groupId>
+                    <artifactId>vpp-api</artifactId>
+                    <version>${vpp.api.version}</version>
+                    <scope>system</scope>
+                    <systemPath>${vpp.local.api.jar}</systemPath>
                 </dependency>
             </dependencies>
         </profile>
@@ -77,9 +75,8 @@
             <dependencies>
                 <dependency>
                     <groupId>de.tubyoub</groupId>
-                    <artifactId>VelocityPteroPower</artifactId>
-                    <version>${vpp.version}</version>
-                    <classifier>api</classifier>
+                    <artifactId>vpp-api</artifactId>
+                    <version>${vpp.api.version}</version>
                     <scope>provided</scope>
                 </dependency>
             </dependencies>
@@ -96,7 +93,6 @@
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
                     <release>${maven.compiler.release}</release>
-                    <!-- Enable Velocity's annotation processor to generate velocity-plugin.json -->
                     <annotationProcessorPaths>
                         <path>
                             <groupId>com.velocitypowered</groupId>
