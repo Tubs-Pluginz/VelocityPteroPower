@@ -111,7 +111,7 @@ buildNumber.properties
 
 # Common working directory
 run/
-/docs/
+# docs/ is tracked — source of truth synced to Tubs-Pluginz/docs
 .secrets
 VPP workflows.md
 
