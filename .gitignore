@@ -114,3 +114,5 @@ run/
 /docs/
 .secrets
 VPP workflows.md
+
+.cursor/
