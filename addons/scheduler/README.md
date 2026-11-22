@@ -12,9 +12,9 @@ Output: `addons/scheduler/target/vpp-addon-scheduler-*.jar` (cron-utils shaded i
 
 ## Install
 
-1. Copy the JAR into `plugins/VelocityPteroPower/addons/`
+1. Copy the JAR into `plugins/velocity-ptero-power/addons/`
 2. Restart Velocity, or run `/ptero addon reload all`
-3. Edit `plugins/VelocityPteroPower/addons/configs/vpp-scheduler.yml`
+3. Edit `plugins/velocity-ptero-power/addons/configs/vpp-scheduler.yml`
 
 ## Config
 

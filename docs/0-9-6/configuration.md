@@ -4,7 +4,7 @@ sidebar: true
 ---
 # Configuration Guide ⚙️
 
-File: `plugins/VelocityPteroPower/config.yml` (written on first start).
+File: `plugins/velocity-ptero-power/config.yml` (written on first start).
 
 ::: tip Backup first
 Copy `config.yml` before large edits. Reloads apply most keys; `apiThreads` still wants a restart.
@@ -65,7 +65,7 @@ Copy `config.yml` before large edits. Reloads apply most keys; `apiThreads` stil
 *   **Type:** `String`
 *   **Default:** `auto`
 *   **Example:** `languageOverride: en_US`
-*   **Notes:** Message files are stored under `plugins/VelocityPteroPower/messages/<lang>.yml`. A legacy single `messages.yml` file is no longer used.
+*   **Notes:** Message files are stored under `plugins/velocity-ptero-power/messages/<lang>.yml`. A legacy single `messages.yml` file is no longer used.
 
 ---
 
@@ -738,7 +738,7 @@ If the plugin reports an error like "Invalid type for 'id' ... Quote the ID in Y
 
 VPP’s player- and console-facing texts are stored in simple YAML “message files.” This lets you translate or customize wording without changing the plugin JAR.
 
-- Location on disk: plugins/VelocityPteroPower/messages/
+- Location on disk: plugins/velocity-ptero-power/messages/
 - File naming: `<locale>.yml` (for example en_US.yml, de_DE.yml)
 - Shipped locales: en_US (English), de_DE (German)
 - Fallbacks: If a key is missing in your selected locale, VPP falls back to en_US for that key.
@@ -759,7 +759,7 @@ languageOverride: auto  # or "en_US" / "de_DE"
 - Multi-line: YAML strings can be quoted or written as | block scalars if you prefer multi-line text.
 
 ::: tip Quick reload
-After editing files in plugins/VelocityPteroPower/messages/, run /ptero reload to apply changes without restarting Velocity.
+After editing files in plugins/velocity-ptero-power/messages/, run /ptero reload to apply changes without restarting Velocity.
 :::
 
 ### Adding a new language
@@ -783,5 +783,5 @@ After editing files in plugins/VelocityPteroPower/messages/, run /ptero reload t
 *   See [Addons](addons.md) for install paths (GitHub assets vs Modrinth pages).
 
 ### `addons.autoLoadOnStartup`
-*   **Default:** `true` — load jars from `plugins/VelocityPteroPower/addons/` on boot.
+*   **Default:** `true` — load jars from `plugins/velocity-ptero-power/addons/` on boot.
 

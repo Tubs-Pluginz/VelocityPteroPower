@@ -103,6 +103,14 @@ public class ServerLifecycleManager {
                     serverName);
                 return;
               }
+              // A group/linked peer may have gained players since this was scheduled
+              var groups = plugin.getServerGroupService();
+              if (groups != null && groups.groupHasPlayers(serverName)) {
+                logger.info(
+                    "Shutdown task for '{}' skipped — a linked/group peer has players.",
+                    serverName);
+                return;
+              }
               // Check emptiness and rate limit before sending stop
               boolean empty = apiClient.isServerEmpty(serverName);
               if (rateLimitTracker.canMakeRequest() && empty) {
@@ -377,6 +385,12 @@ public class ServerLifecycleManager {
               if (plugin.getPlayerConnectionHandler() != null
                   && !plugin.getPlayerConnectionHandler().isSafeToIdleStop(name)) {
                 logger.debug("Idle sweep: '{}' has waiters — skipping shutdown schedule.", name);
+                continue;
+              }
+              if (plugin.getServerGroupService() != null
+                  && plugin.getServerGroupService().groupHasPlayers(name)) {
+                logger.debug("Idle sweep: '{}' has a group/linked peer with players — skipping.", name);
+                plugin.getShutdownDeadlines().remove(name);
                 continue;
               }
               logger.debug("[DEBUG] Idle sweep: scheduling shutdown for '{}' (timeout={}s)", name, timeout);

@@ -28,6 +28,7 @@ public class PteroCommand implements SimpleCommand {
     private final MessagesManager messages;
 
     private final Map<UUID, Long> pendingForceStopConfirmations = new HashMap<>();
+    private final Map<UUID, Long> pendingForceStartConfirmations = new HashMap<>();
     private static final long CONFIRMATION_TIMEOUT_MS = 30000;
     private final AddonCommandHandler addonCommandHandler;
 
@@ -307,9 +308,9 @@ public class PteroCommand implements SimpleCommand {
         if (args.length > 1 && args[1].equalsIgnoreCase("confirm")) {
             if (sender instanceof com.velocitypowered.api.proxy.Player p) {
                 UUID id = p.getUniqueId();
-                Long at = pendingForceStopConfirmations.get(id);
+                Long at = pendingForceStartConfirmations.get(id);
                 if (at != null && System.currentTimeMillis() - at < CONFIRMATION_TIMEOUT_MS) {
-                    pendingForceStopConfirmations.remove(id);
+                    pendingForceStartConfirmations.remove(id);
                     forceStartAllServers(sender);
                 } else {
                     sender.sendMessage(messages.prefixed(MessageKey.GENERIC_ERROR, "message", "No pending confirmation."));
@@ -320,7 +321,7 @@ public class PteroCommand implements SimpleCommand {
             return;
         }
         if (sender instanceof com.velocitypowered.api.proxy.Player p) {
-            pendingForceStopConfirmations.put(p.getUniqueId(), System.currentTimeMillis());
+            pendingForceStartConfirmations.put(p.getUniqueId(), System.currentTimeMillis());
         }
         // Strong warning about resource usage
         sender.sendMessage(messages.prefixed(MessageKey.COMMAND_FORCE_START_WARNING));

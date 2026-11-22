@@ -68,9 +68,13 @@ public class PlayerConnectionHandler {
   private final Map<UUID, Long> playerCooldowns;
   private final Map<String, UUID> startInitiators;
   private final Map<UUID, PendingConnect> pendingConnects = new ConcurrentHashMap<>();
+  /** Soft-requeue attempts carried across the PendingConnect that each requeue replaces. */
+  private final Map<UUID, Integer> softRequeueAttempts = new ConcurrentHashMap<>();
   private final Set<String> activeStartupWatchers = ConcurrentHashMap.newKeySet();
   private final Map<String, Long> startupWatcherDeadlines = new ConcurrentHashMap<>();
   private final Set<String> settlingServers = ConcurrentHashMap.newKeySet();
+  /** Servers someone actually joined since their last cold start (idleStartShutdownTime must not fire). */
+  private final Set<String> joinedSinceColdStart = ConcurrentHashMap.newKeySet();
 
   public PlayerConnectionHandler(ProxyServer proxyServer, VelocityPteroPower plugin) {
     this.proxyServer = proxyServer;
@@ -116,6 +120,7 @@ public class PlayerConnectionHandler {
    * Called on player disconnect.
    */
   public void cancelPendingConnect(UUID playerId) {
+    softRequeueAttempts.remove(playerId);
     PendingConnect pending = pendingConnects.remove(playerId);
     if (pending != null) {
       pending.cancelled = true;
@@ -140,6 +145,26 @@ public class PlayerConnectionHandler {
     }
     PteroServerInfo info = serverInfoMap.get(entry.targetServer);
     if (info == null) {
+      plugin.getPersistentQueueService().clear(player.getUniqueId());
+      return;
+    }
+    // A resumed wait can trigger a capacity start, so it must pass the same gates a fresh
+    // connect does: whitelist, maintenance, and the single-use start password.
+    String target = entry.targetServer;
+    var passwords = plugin.getStartPasswordService();
+    boolean blocked =
+        (plugin.getWhitelistManager() != null
+            && !plugin.getWhitelistManager().isPlayerWhitelisted(target, player.getUsername()))
+        || (plugin.getMaintenanceCoordinator() != null
+            && plugin.getMaintenanceCoordinator().isBlocked(player, target))
+        || (passwords != null
+            && passwords.requiresPassword(target)
+            && !passwords.canBypass(player)
+            && !passwords.isAuthorized(player.getUniqueId(), target)
+            && !apiClient.isServerOnline(target, info.getServerId()));
+    if (blocked) {
+      logger.info("Not resuming persistent queue for {} → {} (whitelist/maintenance/start password).",
+          player.getUsername(), target);
       plugin.getPersistentQueueService().clear(player.getUniqueId());
       return;
     }
@@ -304,6 +329,7 @@ public class PlayerConnectionHandler {
       startingServers.remove(serverName);
       startInitiators.remove(serverName);
       plugin.getStartingServersSince().remove(serverName);
+      joinedSinceColdStart.add(serverName);
       logger.debug("Server {} is online. Allowing connection for {}.", serverName, player.getUsername());
       return;
     }
@@ -441,6 +467,10 @@ public class PlayerConnectionHandler {
       }
     }
 
+    if (startingServers.contains(serverName) && isStaleStart(serverName, serverId)) {
+      logger.info("Previous start of '{}' was abandoned (panel reports offline). Starting again.", serverName);
+      startingServers.remove(serverName);
+    }
     if (!startingServers.contains(serverName)) {
       logger.info(
           "Attempting to start server '{}' ({}) for player {}",
@@ -516,9 +546,8 @@ public class PlayerConnectionHandler {
                 forcedHostHolding = plugin.getLobbyBalancerManager().pickHoldingServer();
               }
               case LIMBO_ONLY -> {
-                forcedHostHolding = plugin.getLobbyBalancerManager().pickHoldingServer()
-                    .filter(rs -> configurationManager.getBalancerLimbos()
-                        .contains(rs.getServerInfo().getName()));
+                // pickHoldingServer() prefers lobbies, so ask for a limbo directly
+                forcedHostHolding = plugin.getLobbyBalancerManager().pickLimbo();
               }
               case DISCONNECT -> { /* fall through to disconnect below */ }
             }
@@ -694,6 +723,12 @@ public class PlayerConnectionHandler {
                   return;
                 }
 
+                // A start stopped from outside (panel/admin) leaves a stale 'starting' flag
+                if (startingServers.contains(targetServerName)
+                    && isStaleStart(targetServerName, targetServerInfo.getServerId())) {
+                  logger.info("Start of '{}' was abandoned (panel reports offline). Retrying for waiters.", targetServerName);
+                  startingServers.remove(targetServerName);
+                }
                 // Capacity-queued: try to send START once a slot is available
                 if (!startingServers.contains(targetServerName)
                     && !apiClient.isServerOnline(targetServerName, targetServerInfo.getServerId())) {
@@ -796,6 +831,25 @@ public class PlayerConnectionHandler {
       // leave startingServers so players can re-queue without a full cold start
     } else {
       clearStartingStateIfEmpty(targetServerName);
+    }
+  }
+
+  /**
+   * True when a START was sent a while ago but live panel state (WebSocket cache) says the
+   * server is offline again — e.g. stopped from the panel mid-boot.
+   */
+  private boolean isStaleStart(String serverName, String serverId) {
+    Long since = plugin.getStartingServersSince().get(serverName);
+    long graceMs = Math.max(10, configurationManager.getStartupInitialCheckDelay()) * 1000L;
+    if (since == null || System.currentTimeMillis() - since < graceMs) {
+      return false;
+    }
+    try {
+      var cache = plugin.getServerStateCache();
+      return cache != null
+          && cache.getFreshState(serverId) == de.tubyoub.velocitypteropower.service.ServerStateCache.State.OFFLINE;
+    } catch (Exception e) {
+      return false;
     }
   }
 
@@ -923,6 +977,7 @@ public class PlayerConnectionHandler {
     if (waiting != null) {
       waiting.remove(playerId);
     }
+    softRequeueAttempts.remove(playerId);
     clearStartingStateIfEmpty(serverName);
     if (plugin.getPersistentQueueService() != null) {
       plugin.getPersistentQueueService().clear(playerId);
@@ -1005,11 +1060,13 @@ public class PlayerConnectionHandler {
       ConnectionRequestBuilder.Status status = result.getStatus();
       switch (status) {
         case SUCCESS -> {
+          joinedSinceColdStart.add(serverName);
           logger.info("{} moved to {}", player.getUsername(), serverName);
           pendingConnects.remove(player.getUniqueId());
           removeWaitingPlayer(player.getUniqueId(), serverName);
         }
         case ALREADY_CONNECTED -> {
+          joinedSinceColdStart.add(serverName);
           logger.debug("{} was already on {}", player.getUsername(), serverName);
           pendingConnects.remove(player.getUniqueId());
           removeWaitingPlayer(player.getUniqueId(), serverName);
@@ -1066,14 +1123,17 @@ public class PlayerConnectionHandler {
     if (ageMs > grace * 1000L) {
       return false;
     }
-    if (pending.softRequeueCount >= maxSoft) {
+    int attempts = Math.max(pending.softRequeueCount,
+        softRequeueAttempts.getOrDefault(player.getUniqueId(), 0));
+    if (attempts >= maxSoft) {
       return false;
     }
     PteroServerInfo info = serverInfoMap.get(serverName);
     if (info == null) {
       return false;
     }
-    pending.softRequeueCount++;
+    pending.softRequeueCount = attempts + 1;
+    softRequeueAttempts.put(player.getUniqueId(), pending.softRequeueCount);
     pendingConnects.remove(player.getUniqueId());
     logger.info(
         "Soft-requeueing {} for {} after premature SERVER_DISCONNECTED ({}/{}).",
@@ -1142,8 +1202,19 @@ public class PlayerConnectionHandler {
   private void scheduleInitialIdleCheck(String serverName, String serverId) {
     long idleCheckDelay = configurationManager.getIdleStartShutdownTime();
     if (idleCheckDelay < 0) return;
+    PteroServerInfo idleInfo = serverInfoMap.get(serverName);
+    // timeout -1 (never idle-stop) and balancer-owned lobbies/limbos are out of scope
+    if ((idleInfo != null && idleInfo.getTimeout() < 0)
+        || configurationManager.getBalancerLobbies().contains(serverName)
+        || configurationManager.getBalancerLimbos().contains(serverName)) {
+      return;
+    }
+    joinedSinceColdStart.remove(serverName);
 
     long recheckInterval = Math.max(5, configurationManager.getStartupInitialCheckDelay());
+    // Stop polling a server that never comes up (crash loop / panel refused the start)
+    long giveUpAtMs = System.currentTimeMillis()
+        + (idleCheckDelay + configurationManager.resolveStartupTimeout(serverInfoMap.get(serverName))) * 1000L;
 
     proxyServer
         .getScheduler()
@@ -1152,12 +1223,21 @@ public class PlayerConnectionHandler {
             new Runnable() {
               @Override
               public void run() {
-                if (!startingServers.contains(serverName) && !hasActiveWaiters(serverName)) {
-                  logger.debug("Initial idle check for {}: Cancelled (server no longer starting).", serverName);
+                if (configurationManager.getAlwaysOnlineList() != null
+                    && configurationManager.getAlwaysOnlineList().contains(serverName)) {
+                  logger.debug("Initial idle check for {}: always-online, skipping.", serverName);
                   return;
                 }
 
-                if (!isSafeToIdleStop(serverName)) {
+                if (joinedSinceColdStart.contains(serverName)) {
+                  logger.debug("Initial idle check for {}: a player joined since the start. Normal idle timeout applies.", serverName);
+                  return;
+                }
+
+                // Waiters/watchers/settle mean a transfer is still coming — not idle yet.
+                // (startingServers is NOT a reason to wait: it stays set until someone joins,
+                // which is exactly the "started but nobody came" case this check exists for.)
+                if (hasActiveWaiters(serverName)) {
                   logger.debug(
                       "Initial idle check for {}: Waiters/watcher active. Rescheduling.",
                       serverName);
@@ -1172,8 +1252,12 @@ public class PlayerConnectionHandler {
                 }
 
                 boolean online = apiClient.isServerOnline(serverName, serverId);
+                if (!online && System.currentTimeMillis() >= giveUpAtMs) {
+                  logger.debug("Initial idle check for {}: Server never came online. Giving up.", serverName);
+                  return;
+                }
                 if (online) {
-                  if (apiClient.isServerEmpty(serverName) && isSafeToIdleStop(serverName)) {
+                  if (apiClient.isServerEmpty(serverName) && !hasActiveWaiters(serverName)) {
                     logger.info(
                         messagesManager.raw(MessageKey.SERVER_IDLE_SHUTDOWN)
                             .replace("<server>", serverName));

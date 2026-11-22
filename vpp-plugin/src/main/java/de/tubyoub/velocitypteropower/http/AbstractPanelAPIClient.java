@@ -171,8 +171,16 @@ public abstract class AbstractPanelAPIClient implements PanelAPIClient {
             logger.debug("Ping cache HIT for {} -> {}", serverName, cached.online);
             return cached.online;
         }
+        if (cached != null && cached.online) {
+            // Stale "online" is unsafe: a server stopped seconds ago would get players sent to it.
+            // Re-ping (bounded by pingTimeout) before saying yes.
+            Optional<RegisteredServer> rs = proxyServer.getServer(serverName);
+            boolean online = rs.isPresent() && doVelocityPingBlocking(rs.get(), serverName);
+            pingResultCache.put(serverName, new PingCacheEntry(online, System.currentTimeMillis()));
+            return online;
+        }
         if (cached != null) {
-            // Stale: refresh in background; return last-known without blocking the event thread
+            // Stale "offline": refresh in background; the caller's start/wait flow re-verifies anyway
             scheduleBackgroundPingRefresh(serverName);
             logger.debug("Ping cache STALE for {} — returning last-known {}", serverName, cached.online);
             return cached.online;

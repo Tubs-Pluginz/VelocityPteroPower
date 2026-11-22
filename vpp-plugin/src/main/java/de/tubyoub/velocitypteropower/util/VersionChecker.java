@@ -29,7 +29,9 @@ public class VersionChecker {
      */
     public static VersionInfo isNewVersionAvailable(String version, String project) {
         try {
-            URL url = new URL("https://api.modrinth.com/v2/project/" + project + "/version");
+            // Overridable so tests (and air-gapped mirrors) can point at another Modrinth-compatible API
+            String base = System.getProperty("velocitypteropower.modrinthApi", "https://api.modrinth.com");
+            URL url = new URL(base.replaceAll("/+$", "") + "/v2/project/" + project + "/version");
 
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");

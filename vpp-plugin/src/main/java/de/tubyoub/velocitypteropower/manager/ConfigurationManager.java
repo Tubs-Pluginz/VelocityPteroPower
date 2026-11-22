@@ -179,6 +179,12 @@ public class ConfigurationManager {
                                         .addIgnoredRoute("16", "servers", '.')
                                         .addIgnoredRoute("16", "profiles", '.')
                                         .addIgnoredRoute("17", "profiles", '.')
+                                        // boosted-yaml looks ignored routes up by the BUNDLED (defaults) version,
+                                        // so every user-owned section must be listed for the current fileversion,
+                                        // or upgrading an older config replaces it with the bundled example.
+                                        .addIgnoredRoute("17", "servers", '.')
+                                        .addIgnoredRoute("17", "serverGroups", '.')
+                                        .addIgnoredRoute("17", "limboServer", '.')
                                         .build());
 
 
@@ -345,6 +351,7 @@ public class ConfigurationManager {
                     }
                     config.remove(Route.fromString("limboServer"));
                     config.save();
+                    balancerLimbos = config.getStringList("lobbyBalancer.limbos");
                     logger.info("Migrated legacy 'limboServer' to 'lobbyBalancer.limbos' and removed the old key.");
                 }
             } catch (Exception ignored) {}

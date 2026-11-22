@@ -12,7 +12,7 @@ import java.util.UUID;
 
 /**
  * Example VPP-managed addon. Drop the built JAR into
- * {@code plugins/VelocityPteroPower/addons/} or install via {@code /ptero addon install vpp-sample}.
+ * {@code plugins/velocity-ptero-power/addons/} or install via {@code /ptero addon install vpp-sample}.
  */
 public final class SampleAddon implements VPPAddon {
     private AddonContext ctx;

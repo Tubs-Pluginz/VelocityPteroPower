@@ -11,6 +11,7 @@ import de.tubyoub.velocitypteropower.handler.PlayerConnectionHandler;
 import de.tubyoub.velocitypteropower.http.PanelAPIClient;
 import de.tubyoub.velocitypteropower.http.PowerSignal;
 import de.tubyoub.velocitypteropower.manager.ConfigurationManager;
+import de.tubyoub.velocitypteropower.manager.ConfigurationManager.ServerCheckMethod;
 import de.tubyoub.velocitypteropower.manager.MessageKey;
 import de.tubyoub.velocitypteropower.manager.MessagesManager;
 import de.tubyoub.velocitypteropower.model.PteroServerInfo;
@@ -22,8 +23,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -129,5 +132,63 @@ class ServerLifecycleManagerTest {
 
         runnableCaptor.getValue().run();
         verify(apiClient).powerServer("srv-1", PowerSignal.STOP);
+    }
+
+    @Test
+    void shutdownConfirmationRetriesStopWhileTheServerStaysOnline() {
+        when(apiClient.isServerOnline("survival", "srv-1")).thenReturn(true);
+        when(apiClient.isServerEmpty("survival")).thenReturn(true);
+        when(config.getShutdownRetries()).thenReturn(2);
+        when(config.getShutdownRetryDelay()).thenReturn(15);
+
+        List<Runnable> tasks = new ArrayList<>();
+        when(scheduler.buildTask(eq(plugin), any(Runnable.class))).thenAnswer(inv -> {
+            tasks.add(inv.getArgument(1));
+            return taskBuilder;
+        });
+
+        ServerLifecycleManager mgr = new ServerLifecycleManager(proxy, plugin);
+        PteroServerInfo survivalInfo = new PteroServerInfo("srv-1", 30, 5, false);
+        mgr.checkAndScheduleShutdownIfNeeded("survival", survivalInfo);
+        assertThat(tasks).hasSize(1);
+
+        tasks.get(0).run();
+        verify(apiClient, times(1)).powerServer("srv-1", PowerSignal.STOP);
+        assertThat(tasks).hasSize(2);
+
+        tasks.get(1).run();
+        verify(apiClient, times(2)).powerServer("srv-1", PowerSignal.STOP);
+    }
+
+    @Test
+    void panelApiCountReturnsUnknownWhenRateLimitedAndHybridStillCounts() {
+        when(config.getServerCheckMethod()).thenReturn(ServerCheckMethod.PANEL_API);
+        when(rateLimit.canMakeRequest()).thenReturn(false);
+        ServerLifecycleManager mgr = new ServerLifecycleManager(proxy, plugin);
+
+        assertThat(mgr.countOnlineServersExcluding(Set.of())).isEqualTo(-1);
+
+        when(rateLimit.canMakeRequest()).thenReturn(true);
+        when(config.getServerCheckMethod()).thenReturn(ServerCheckMethod.HYBRID);
+        when(apiClient.isServerOnline(anyString(), anyString())).thenReturn(true);
+        assertThat(mgr.countOnlineServersExcluding(Set.of("limbo"))).isEqualTo(1);
+    }
+
+    @Test
+    void scheduledShutdownIsSkippedWhenAGroupPeerGainedPlayers() {
+        ServerLifecycleManager mgr = new ServerLifecycleManager(proxy, plugin);
+        PteroServerInfo survivalInfo = new PteroServerInfo("srv-1", 30, 5, false);
+        when(apiClient.isServerOnline("survival", "srv-1")).thenReturn(true);
+        when(apiClient.isServerEmpty("survival")).thenReturn(true);
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+
+        mgr.checkAndScheduleShutdownIfNeeded("survival", survivalInfo);
+        verify(scheduler).buildTask(eq(plugin), task.capture());
+
+        // Scheduled while the group was empty; a peer has players by the time it fires
+        when(groupService.groupHasPlayers("survival")).thenReturn(true);
+        task.getValue().run();
+
+        verify(apiClient, never()).powerServer("srv-1", PowerSignal.STOP);
     }
 }

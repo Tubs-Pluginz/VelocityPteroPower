@@ -205,6 +205,10 @@ public final class AddonManager {
                     addon.getMeta(),
                     new Slf4jAddonLogger(logger, addon.getMeta().id()),
                     dataDir);
+            // The AddonConfig instance is cached across disable/enable; re-read it so edits made
+            // to addons/configs/<id>.yml before `/ptero addon reload` are not overwritten by the
+            // addon's seedDefaults() save of the stale in-memory copy.
+            try { api.getAddonConfig(addon.getMeta().id()).reload(); } catch (Exception ignored) {}
             addon.getInstance().onEnable(ctx);
             addon.setContext(ctx);
             addon.setStatus(LoadedAddon.Status.ACTIVE);

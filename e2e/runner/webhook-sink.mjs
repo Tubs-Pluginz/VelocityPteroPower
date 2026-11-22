@@ -24,7 +24,8 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 200, { status: 'ok', capturedCount: received.length });
   }
 
-  if (req.method === 'POST' && url.pathname === '/webhook') {
+  // Any POST under /webhook (generic endpoint, Discord-shaped paths like /webhook/discord.com/api/webhooks/...)
+  if (req.method === 'POST' && (url.pathname === '/webhook' || url.pathname.startsWith('/webhook/'))) {
     let raw = '';
     req.on('data', chunk => { raw += chunk; });
     req.on('end', () => {
@@ -32,6 +33,7 @@ const server = http.createServer((req, res) => {
       try { parsed = JSON.parse(raw); } catch { /* keep raw */ }
       received.push({
         receivedAt: new Date().toISOString(),
+        path: url.pathname,
         headers: req.headers,
         body: parsed ?? raw
       });
@@ -52,14 +54,18 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/catalog/addons.json') {
-    try {
-      const content = fs.readFileSync(CATALOG_FILE, 'utf8');
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(content);
-    } catch {
-      sendJson(res, 200, { schemaVersion: 1, addons: [] });
+    // Serve the repo catalog, but point each downloadUrl at the freshly built local JAR so
+    // `/ptero addon install|update` is exercised hermetically (no GitHub download).
+    let doc = { schemaVersion: 1, addons: [] };
+    try { doc = JSON.parse(fs.readFileSync(CATALOG_FILE, 'utf8')); } catch { /* empty catalog */ }
+    let jars = [];
+    try { jars = fs.readdirSync(ADDONS_DIR).filter(f => f.endsWith('.jar') && !f.startsWith('original-')); } catch { /* none */ }
+    for (const entry of doc.addons || []) {
+      const short = String(entry.id || '').replace(/^vpp-/, '');
+      const jar = jars.find(f => f.startsWith(`vpp-addon-${short}`));
+      if (jar) entry.downloadUrl = `http://${req.headers.host}/catalog/jars/${jar}`;
     }
-    return;
+    return sendJson(res, 200, doc);
   }
 
   if (req.method === 'GET' && url.pathname.startsWith('/catalog/jars/')) {

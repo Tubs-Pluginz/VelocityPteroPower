@@ -8,11 +8,11 @@ sidebar: true
 0.9.6 ships a small addon loader. Addons are **not** Velocity plugins. They are jars that implement `de.tubyoub.vpp.api.VPPAddon` and sit under:
 
 ```text
-plugins/VelocityPteroPower/addons/
+plugins/velocity-ptero-power/addons/
 ```
 
-Configs: `plugins/VelocityPteroPower/addons/configs/{addonId}.yml`  
-Data: `plugins/VelocityPteroPower/addons/data/{addonId}/`
+Configs: `plugins/velocity-ptero-power/addons/configs/{addonId}.yml`  
+Data: `plugins/velocity-ptero-power/addons/data/{addonId}/`
 
 ## Official addons
 

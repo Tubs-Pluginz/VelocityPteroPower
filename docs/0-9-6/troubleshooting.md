@@ -152,7 +152,7 @@ This typically indicates a temporary issue with the HTTP/2 connection between yo
 *   Catalog install fails.
 
 **Checklist:**
-1.  Jars belong in `plugins/VelocityPteroPower/addons/` (not Velocity's root `plugins/`).
+1.  Jars belong in `plugins/velocity-ptero-power/addons/` (not Velocity's root `plugins/`).
 2.  Catalog install pulls GitHub Release assets from the `nightly` prerelease — that release must exist and include the addon jar.
 3.  Browse treats a successfully loaded jar as installed even if you dropped it by hand.
 4.  Sample addon has no catalog download URL; build it locally if you need it.
@@ -172,7 +172,7 @@ If you're still stuck, ask in the [Support Discord](https://discord.pluginz.dev)
     `apiKey: "ptlc_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"`
     :::
     *   Prefer [Pastebin](https://pastebin.com/) with the key masked.
-*   **Language files** under `plugins/VelocityPteroPower/messages/<lang>.yml` if the issue is message-related.
+*   **Language files** under `plugins/velocity-ptero-power/messages/<lang>.yml` if the issue is message-related.
 *   **Debug console logs** (`loggerLevel: 10`) from proxy start through the failure — upload to [mclo.gs](https://mclo.gs/).
     ::: tip Do Not Paste Directly
     Please **do not** paste long logs or configs into Discord. Use the links above.

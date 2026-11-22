@@ -14,13 +14,13 @@ Output: `addons/sample/target/vpp-addon-sample-*.jar`
 
 ## Install
 
-1. Copy the JAR into `plugins/VelocityPteroPower/addons/`
+1. Copy the JAR into `plugins/velocity-ptero-power/addons/`
 2. Restart Velocity, or run `/ptero addon reload all` if VPP is already running and the JAR was replaced
 3. Or use `/ptero addon install vpp-sample` once an addon release asset is published (see catalog download URLs)
 
 ## Config
 
-YAML is stored at `plugins/VelocityPteroPower/addons/configs/vpp-sample.yml` (legacy `addons/vpp-sample.yml` is migrated automatically).
+YAML is stored at `plugins/velocity-ptero-power/addons/configs/vpp-sample.yml` (legacy `addons/vpp-sample.yml` is migrated automatically).
 
 ## Commands (examples)
 

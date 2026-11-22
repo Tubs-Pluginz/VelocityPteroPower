@@ -168,7 +168,7 @@ jobs:
             echo "- Commit: [\`${SHORT_SHA}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})"
             echo
             echo "Plugin alpha is also on [Modrinth](https://modrinth.com/plugin/velocitypteropower)."
-            echo "Official addons are GitHub-only (drop into \`plugins/VelocityPteroPower/addons/\`)."
+            echo "Official addons are GitHub-only (drop into \`plugins/velocity-ptero-power/addons/\`)."
             echo
             echo "### Commits in this push"
             cat changelog.md

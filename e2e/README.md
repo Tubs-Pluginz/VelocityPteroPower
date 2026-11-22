@@ -49,6 +49,22 @@ mvn test
    - Built-in `/ptero maintenance` and external `MaintenanceProvider` SPI cold-start blocking
    - Persistent queue reconnect resume
    - Core `/ptero` commands and official addons (`vpp-webhooks`, `vpp-scheduler`, `vpp-move-history`)
+   - Admin power commands (`start`, `restart`, `stop`, `stopidle`) on live Wings, including a grouped peer start
+   - Staff commands (`password`, `queue`, `api`, `apithreads`, `reload`, `history`) plus permission denial and the unconfirmed `forcestopall` / `forcestartall` prompt
+   - Global maintenance blocking a cold start
+   - `ptero.maxcap.bypass` starting a server while `maxOnlineServers` is full
+   - `playerStartCooldown` blocking a second cold start
+   - Four simultaneous players across lobby scale-up plus two game backends
+   - Group idle-shutdown guard (occupied `skywars` keeps empty `bedwars` online)
+   - `RoutingProvider` rewriting a forced-host connect onto limbo
+   - Idle extra lobby scaling back down (`scaleDownIdleSeconds`) while `minOnline` keeps lobby-1
+   - Config variants flipped at runtime via the bridge `/file` endpoint + `/ptero reload`: `queueWhenMaxOnline=false`, `maxOnlineReservations`, `forcedHostOfflineBehavior` `DISCONNECT` / `LIMBO_ONLY`, `serverStatusCheckMethod` `PANEL_API` / `VELOCITY_PING`, `languageOverride: de_DE`
+   - Tab-complete (bridge `/suggest`), `password generate` + player unlock, `/ptero queue` and `/ptero history` content
+   - Webhooks `format: auto` sending Discord embeds to a Discord-shaped URL and generic JSON elsewhere, plus `/ptero webhook test`
+   - Addon manager `browse`, `disable`/`enable`, `uninstall` + `install` from the catalog (webhook-sink serves the freshly built JARs), move-history surviving an addon reload
+   - Scheduler firing a real `* * * * *` cron against Wings
+   - `resourcePrefetchEnabled` warming the resource cache for every server
+   - Confirmed `forcestartall` / `forcestopall`, then always-online + `minOnline` recovery
    - Graceful proxy shutdown (`shutdownOnProxyExit`) stopping servers on live Wings
 6. **Generates a Versioned Test Log & Report automatically on every run (pass, fail, or early setup error)** under `e2e/reports/<timestamp>-<panel>/` (with latest shortcuts `e2e/reports/latest-<panel>.{log,md,html}`):
    - `test-run.log` — single self-contained log file with **all resolved `:latest` versions, OCI digests, and pass/fail summary right at the top**, followed by full `provision`, `runner`, `velocity`, `panel`, `wings`, and `webhook-sink` logs

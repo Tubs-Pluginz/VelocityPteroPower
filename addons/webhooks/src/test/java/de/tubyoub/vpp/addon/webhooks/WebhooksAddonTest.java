@@ -90,4 +90,66 @@ class WebhooksAddonTest {
                     .contains("\"signal\":\"start\"");
         });
     }
+
+    @SuppressWarnings("unchecked")
+    private Consumer<de.tubyoub.vpp.api.event.PlayerPostConnectEvent> enableWith(String format, String url, List<String> extra) {
+        AddonContext ctx = mock(AddonContext.class);
+        AddonConfig cfg = mock(AddonConfig.class);
+        when(ctx.getConfig()).thenReturn(cfg);
+        when(ctx.getLogger()).thenReturn(mock(AddonLogger.class));
+        when(cfg.getString(eq("format"), anyString())).thenReturn(format);
+        when(cfg.getString(eq("webhookUrl"), anyString())).thenReturn(url);
+        when(cfg.getStringList("webhookUrls")).thenReturn(extra);
+        when(cfg.getBoolean(anyString(), anyBoolean())).thenAnswer(inv -> inv.getArgument(1));
+        final Consumer<de.tubyoub.vpp.api.event.PlayerPostConnectEvent>[] listener = new Consumer[1];
+        doAnswer(inv -> {
+            listener[0] = inv.getArgument(1);
+            return null;
+        }).when(ctx).subscribe(eq(de.tubyoub.vpp.api.event.PlayerPostConnectEvent.class), any());
+        addon.onEnable(ctx);
+        return listener[0];
+    }
+
+    @Test
+    void discordFormatPostsAnEmbed() {
+        String url = "http://127.0.0.1:" + sink.getAddress().getPort() + "/hook";
+        var listener = enableWith("discord", url, List.of());
+        listener.accept(new de.tubyoub.vpp.api.event.PlayerPostConnectEvent(
+                java.util.UUID.randomUUID(), "Alice", "survival"));
+
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+            assertThat(bodies).hasSize(1);
+            assertThat(bodies.get(0))
+                    .contains("\"username\":\"VelocityPteroPower\"")
+                    .contains("\"embeds\":[{")
+                    .contains("\"title\":\"Player connected\"")
+                    .contains("\"color\":" + 0x57F287)
+                    .contains("{\"name\":\"playerName\",\"value\":\"Alice\",\"inline\":true}")
+                    .doesNotContain("\"source\":\"vpp-webhooks\"");
+        });
+    }
+
+    @Test
+    void autoFormatPicksDiscordByUrlAndGenericOtherwise() {
+        String base = "http://127.0.0.1:" + sink.getAddress().getPort() + "/hook";
+        var listener = enableWith("auto", base + "/discord.com/api/webhooks/1/abc", List.of(base + "/generic"));
+        listener.accept(new de.tubyoub.vpp.api.event.PlayerPostConnectEvent(
+                java.util.UUID.randomUUID(), "Bob", "lobby"));
+
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+            assertThat(bodies).hasSize(2);
+            assertThat(bodies).anyMatch(b -> b.contains("\"embeds\"") && b.contains("Bob"));
+            assertThat(bodies).anyMatch(b -> b.contains("\"event\":\"connect\"") && b.contains("\"playerName\":\"Bob\""));
+        });
+    }
+
+    @Test
+    void escapesQuotesAndNewlinesInPayloads() {
+        String url = "http://127.0.0.1:" + sink.getAddress().getPort() + "/hook";
+        var listener = enableWith("generic", url, List.of());
+        listener.accept(new de.tubyoub.vpp.api.event.PlayerPostConnectEvent(
+                java.util.UUID.randomUUID(), "Eve\"\nX", "survival"));
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
+                assertThat(bodies).singleElement().asString().contains("\"playerName\":\"Eve\\\"\\nX\""));
+    }
 }

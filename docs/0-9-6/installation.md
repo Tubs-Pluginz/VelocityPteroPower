@@ -18,7 +18,7 @@ Velocity 3.x and Java 21 will not work with 0.9.6.
 
 2. **Drop it** into the Velocity `plugins/` folder.
 
-3. **Start the proxy once** so VPP writes `plugins/VelocityPteroPower/config.yml` and `plugins/VelocityPteroPower/messages/`.
+3. **Start the proxy once** so VPP writes `plugins/velocity-ptero-power/config.yml` and `plugins/velocity-ptero-power/messages/`.
 
    ::: info First launch
    Language files live under `messages/` (for example `en_US.yml`). A single root `messages.yml` is no longer used.

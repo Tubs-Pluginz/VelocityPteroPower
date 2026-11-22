@@ -34,8 +34,10 @@ cp "${SHARED_DIR}/vpp-config.yml" "${VPP_DATA_DIR}/config.yml"
 cat > "${VPP_DATA_DIR}/addons/configs/vpp-webhooks.yml" <<'EOF'
 enabled: true
 webhookUrl: "http://webhook-sink:19091/webhook"
-webhookUrls: []
-format: "generic"
+# Second endpoint whose URL looks like a Discord webhook: format=auto must send it an embed
+webhookUrls:
+  - "http://webhook-sink:19091/webhook/discord.com/api/webhooks/e2e/token"
+format: "auto"
 events:
   power: true
   connect: true

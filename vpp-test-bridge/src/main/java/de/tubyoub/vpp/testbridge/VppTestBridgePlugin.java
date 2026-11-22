@@ -102,6 +102,8 @@ public final class VppTestBridgePlugin {
             httpServer.createContext("/maintenance-provider", this::handleMaintenanceProvider);
             httpServer.createContext("/routing-provider", this::handleRoutingProvider);
             httpServer.createContext("/shutdown", this::handleShutdown);
+            httpServer.createContext("/suggest", this::handleSuggest);
+            httpServer.createContext("/file", this::handleFile);
             httpServer.start();
             logger.info("VPP Test Bridge listening on 0.0.0.0:{}", port);
         } catch (IOException e) {
@@ -235,6 +237,8 @@ public final class VppTestBridgePlugin {
             }
         }
         out.put("serverStateCache", cacheStates);
+        out.put("resourceCacheServerIds", resourceCacheKeys(p));
+        out.put("messagesLanguage", p.getMessagesManager() != null ? p.getMessagesManager().getLanguage() : null);
 
         List<Map<String, Object>> players = new ArrayList<>();
         for (Player pl : proxyServer.getAllPlayers()) {
@@ -412,6 +416,101 @@ public final class VppTestBridgePlugin {
                 .buildTask(this, () -> proxyServer.shutdown())
                 .delay(250, TimeUnit.MILLISECONDS)
                 .schedule();
+    }
+
+    /** Server ids currently held in the API client's resource-usage cache (warmed by resourcePrefetch). */
+    @SuppressWarnings("unchecked")
+    private static List<String> resourceCacheKeys(VelocityPteroPower p) {
+        try {
+            Object client = p.getApiClient();
+            // Unwrap EventingPanelAPIClient (or any decorator) to the concrete HTTP client
+            for (int depth = 0; depth < 3 && client != null; depth++) {
+                java.lang.reflect.Field delegate = null;
+                try {
+                    delegate = client.getClass().getDeclaredField("delegate");
+                } catch (NoSuchFieldException ignored) {
+                    break;
+                }
+                delegate.setAccessible(true);
+                client = delegate.get(client);
+            }
+            for (Class<?> c = client.getClass(); c != null; c = c.getSuperclass()) {
+                try {
+                    java.lang.reflect.Field f = c.getDeclaredField("resourceCache");
+                    f.setAccessible(true);
+                    return new ArrayList<>(new TreeSet<>(((Map<String, ?>) f.get(client)).keySet()));
+                } catch (NoSuchFieldException ignored) {
+                    // try superclass
+                }
+            }
+        } catch (Exception ignored) {
+            // fall through
+        }
+        return List.of();
+    }
+
+    /** POST {command, permissions?} → tab-complete suggestions as Velocity would offer them. */
+    private void handleSuggest(HttpExchange ex) throws IOException {
+        if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
+            sendJson(ex, 405, Map.of("error", "POST required"));
+            return;
+        }
+        JsonObject body = readJsonBody(ex);
+        String command = body.has("command") ? body.get("command").getAsString() : "";
+        if (command.startsWith("/")) {
+            command = command.substring(1);
+        }
+        boolean allPerms = !body.has("allPermissions") || body.get("allPermissions").getAsBoolean();
+        Set<String> perms = new HashSet<>();
+        if (body.has("permissions") && body.get("permissions").isJsonArray()) {
+            allPerms = false;
+            for (JsonElement el : body.getAsJsonArray("permissions")) {
+                perms.add(el.getAsString());
+            }
+        }
+        CapturingCommandSource source = new CapturingCommandSource(allPerms, perms);
+        List<String> suggestions = proxyServer.getCommandManager().offerSuggestions(source, command).join();
+        sendJson(ex, 200, Map.of("suggestions", suggestions));
+    }
+
+    /**
+     * GET ?path=rel → file content; POST {path, content} → write. Paths are relative to the VPP
+     * data directory (plugins/velocity-ptero-power) and may not escape it. Used by the suite to flip
+     * config values before /ptero reload and to rewrite addon configs.
+     */
+    private void handleFile(HttpExchange ex) throws IOException {
+        java.nio.file.Path root = java.nio.file.Paths.get("plugins", "velocity-ptero-power").toAbsolutePath().normalize();
+        String rel;
+        String content = null;
+        if ("GET".equalsIgnoreCase(ex.getRequestMethod())) {
+            String query = ex.getRequestURI().getRawQuery();
+            rel = query != null && query.startsWith("path=")
+                    ? java.net.URLDecoder.decode(query.substring(5), StandardCharsets.UTF_8) : "";
+        } else if ("POST".equalsIgnoreCase(ex.getRequestMethod())) {
+            JsonObject body = readJsonBody(ex);
+            rel = body.has("path") ? body.get("path").getAsString() : "";
+            content = body.has("content") ? body.get("content").getAsString() : null;
+        } else {
+            sendJson(ex, 405, Map.of("error", "GET or POST required"));
+            return;
+        }
+        java.nio.file.Path target = root.resolve(rel).normalize();
+        if (rel.isBlank() || !target.startsWith(root)) {
+            sendJson(ex, 400, Map.of("error", "path must stay inside " + root));
+            return;
+        }
+        if (content == null) {
+            if (!java.nio.file.Files.isRegularFile(target)) {
+                sendJson(ex, 404, Map.of("error", "not found", "path", rel));
+                return;
+            }
+            sendJson(ex, 200, Map.of("path", rel, "content",
+                    java.nio.file.Files.readString(target, StandardCharsets.UTF_8)));
+            return;
+        }
+        java.nio.file.Files.createDirectories(target.getParent());
+        java.nio.file.Files.writeString(target, content, StandardCharsets.UTF_8);
+        sendJson(ex, 200, Map.of("ok", true, "path", rel, "bytes", content.length()));
     }
 
     private static JsonObject readJsonBody(HttpExchange ex) throws IOException {

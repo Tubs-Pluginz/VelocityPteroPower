@@ -57,8 +57,9 @@ alwaysOnline:
   - limbo
 alwaysOnlineCheckInterval: 15
 
-resourceCacheSeconds: 5
-resourcePrefetchEnabled: false
+# Prefetch on so scenario 27 can assert every server's resources are warmed (20s keeps panel load low)
+resourceCacheSeconds: 20
+resourcePrefetchEnabled: true
 idleShutdownCheckInterval: 10
 
 moveHistory:

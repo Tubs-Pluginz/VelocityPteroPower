@@ -14,11 +14,11 @@ Output: `addons/move-history/target/vpp-addon-move-history-*.jar`
 
 ## Install
 
-1. Copy the JAR into `plugins/VelocityPteroPower/addons/`
+1. Copy the JAR into `plugins/velocity-ptero-power/addons/`
 2. Restart Velocity, or run `/ptero addon reload all`
-3. Optional: tune retention in `plugins/VelocityPteroPower/addons/configs/vpp-move-history.yml`
+3. Optional: tune retention in `plugins/velocity-ptero-power/addons/configs/vpp-move-history.yml`
 
-Data file: `plugins/VelocityPteroPower/addons/data/vpp-move-history/history.json`
+Data file: `plugins/velocity-ptero-power/addons/data/vpp-move-history/history.json`
 
 ## Config
 

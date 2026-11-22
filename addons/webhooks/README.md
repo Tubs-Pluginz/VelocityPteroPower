@@ -12,9 +12,9 @@ Output: `addons/webhooks/target/vpp-addon-webhooks-*.jar`
 
 ## Install
 
-1. Copy the JAR into `plugins/VelocityPteroPower/addons/`
+1. Copy the JAR into `plugins/velocity-ptero-power/addons/`
 2. Restart Velocity, or run `/ptero addon reload all`
-3. Edit `plugins/VelocityPteroPower/addons/configs/vpp-webhooks.yml` and set `webhookUrl`
+3. Edit `plugins/velocity-ptero-power/addons/configs/vpp-webhooks.yml` and set `webhookUrl`
 
 ## Config
 

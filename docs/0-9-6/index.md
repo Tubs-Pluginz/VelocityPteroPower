@@ -50,7 +50,7 @@ A player hits an offline managed server. VPP sends a start to the panel, parks t
 *   **📋 List & info panels:** MiniMessage `/ptero list` and `/ptero info <server>` with status, players, TTL, and resource usage.
 *   **🟢 Always-online:** Keeps listed servers up and skips idle stop for them.
 *   **🧊 Resource cache:** Caches (and can prefetch) panel resource responses for snappy commands.
-*   **🧩 Addons:** Official jars under `plugins/VelocityPteroPower/addons/` plus a public API.
+*   **🧩 Addons:** Official jars under `plugins/velocity-ptero-power/addons/` plus a public API.
 *   **🔄 Config reload:** `/ptero reload` for most settings without a full proxy restart.
 *   **🔔 Update checks:** Optional Modrinth update notice on startup.
 

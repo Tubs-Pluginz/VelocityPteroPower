@@ -399,7 +399,7 @@ servers:
 #     - skywars
 #     - bedwars
 
-# VPP-managed addons (JARs under plugins/VelocityPteroPower/addons/)
+# VPP-managed addons (JARs under plugins/velocity-ptero-power/addons/)
 addons:
   # Official catalog (GitHub raw). Operators can extend it with extraCatalogUrls / extraEntries.
   catalogUrl: "https://raw.githubusercontent.com/Tubs-Pluginz/VelocityPteroPower/dev/catalog/addons.json"

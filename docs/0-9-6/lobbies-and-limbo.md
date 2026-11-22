@@ -9,7 +9,7 @@ Lobbies are hubs. Limbos are light waiting rooms while a target boots. VPP can p
 ## Quick start
 
 1. Pick Velocity server names for your hubs and waiting rooms.
-2. Edit `plugins/VelocityPteroPower/config.yml`:
+2. Edit `plugins/velocity-ptero-power/config.yml`:
 
 ```yaml
 lobbyBalancer:

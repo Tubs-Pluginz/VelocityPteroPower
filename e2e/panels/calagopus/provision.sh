@@ -142,15 +142,31 @@ fi
 
 # Set Calagopus app.url = http://panel:8000 so /wings-proxy/{node_uuid} WebSocket URLs
 # resolve to ws://panel:8000/... instead of ws://localhost:8000/... inside Docker.
-SETTINGS_JSON="$(api_get "/api/admin/settings" || echo '{}')"
-APP_PATCH="$(printf '%s' "${SETTINGS_JSON}" | jq '{app: ((.app // {}) + {url: "http://panel:8000"})}' 2>/dev/null || echo '{"app":{"url":"http://panel:8000"}}')"
-SET_RES="$(curl -sS -w '\n%{http_code}' -X PUT "${BASE_URL}/api/admin/settings" \
-  -H "Authorization: Bearer ${CLIENT_KEY}" \
-  -H "Accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d "${APP_PATCH}")"
-SET_CODE="$(printf '%s\n' "${SET_RES}" | tail -n1)"
+# If app.url stays localhost, every Wings WebSocket URL is unreachable from Velocity. Retry, fail loudly.
+SET_CODE=""
+for attempt in $(seq 1 15); do
+  SETTINGS_JSON="$(api_get "/api/admin/settings" 2>/dev/null || echo '{}')"
+  APP_PATCH="$(printf '%s' "${SETTINGS_JSON}" | jq '{app: ((.app // {}) + {url: "http://panel:8000"})}' 2>/dev/null || echo '{"app":{"url":"http://panel:8000"}}')"
+  # Newer Calagopus only lets a real admin *session* change panel URLs (API keys get 403),
+  # so use the logged-in admin cookie; fall back to the API key on older builds.
+  if [ $((attempt % 2)) -eq 1 ]; then AUTH_ARGS=(-b "${COOKIE_JAR}"); else AUTH_ARGS=(-H "Authorization: Bearer ${CLIENT_KEY}"); fi
+  SET_RES="$(curl -sS -w '\n%{http_code}' -X PUT "${BASE_URL}/api/admin/settings" \
+    "${AUTH_ARGS[@]}" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
+    -d "${APP_PATCH}")"
+  SET_CODE="$(printf '%s\n' "${SET_RES}" | tail -n1)"
+  if [ "${SET_CODE}" -ge 200 ] 2>/dev/null && [ "${SET_CODE}" -lt 300 ]; then
+    break
+  fi
+  echo "[calagopus-provision] app.url update attempt ${attempt} got HTTP ${SET_CODE}: $(printf '%s\n' "${SET_RES}" | sed '$d' | head -c 300)" >&2
+  sleep 2
+done
 echo "[calagopus-provision] Updated Calagopus app.url -> http://panel:8000 (HTTP ${SET_CODE})"
+if ! { [ "${SET_CODE}" -ge 200 ] 2>/dev/null && [ "${SET_CODE}" -lt 300 ]; }; then
+  echo "[calagopus-provision] ERROR: could not set app.url; Wings WebSocket URLs would point at localhost." >&2
+  exit 1
+fi
 
 # Point the AIO node's public_url at the panel's built-in /wings-proxy/{node_uuid} endpoint
 # reachable from Velocity inside Docker (http://panel:8000) instead of localhost.
@@ -211,7 +227,18 @@ create_server() {
       variables: [{ env_variable: "VELOCITY_SECRET", value: "vpp-e2e-forwarding-secret" }]
     }')"
 
-  api_post "/api/admin/servers" "${payload}" | jq -r '.server.uuid'
+  # The AIO image's integrated Wings may still be booting (panel -> localhost:<wings> refused,
+  # surfaced as HTTP 500). Retry instead of failing the whole provision.
+  local out attempt
+  for attempt in $(seq 1 20); do
+    if out="$(api_post "/api/admin/servers" "${payload}")"; then
+      printf '%s' "${out}" | jq -r '.server.uuid'
+      return 0
+    fi
+    echo "[calagopus-provision] server create attempt ${attempt} failed; waiting for integrated Wings..." >&2
+    sleep 3
+  done
+  return 1
 }
 
 echo "[calagopus-provision] Creating 6 real Minecraft servers on live Calagopus AIO..."
@@ -248,6 +275,12 @@ done
 
 WS_CHECK="$(api_get "/api/client/servers/${ID_LIMBO}/websocket" | jq -c 'if .token then .token="<redacted>" else . end' 2>/dev/null || echo "failed")"
 echo "[calagopus-provision] Limbo websocket endpoint: ${WS_CHECK}"
+case "${WS_CHECK}" in
+  *"//localhost"*|*"//127.0.0.1"*)
+    echo "[calagopus-provision] ERROR: websocket URL points at localhost; Velocity cannot reach it." >&2
+    exit 1
+    ;;
+esac
 
 PICOLIMBO_VERSION="$(curl -fsSL \
   "${BASE_URL}/api/client/servers/${ID_LIMBO}/files/contents?file=%2Fpicolimbo-version.txt" \
