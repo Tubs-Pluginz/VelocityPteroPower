@@ -71,6 +71,7 @@ public class PlayerConnectionHandler {
   private final Set<String> activeStartupWatchers = ConcurrentHashMap.newKeySet();
   private final Map<String, Long> startupWatcherDeadlines = new ConcurrentHashMap<>();
   private final Set<String> settlingServers = ConcurrentHashMap.newKeySet();
+  private final Map<UUID, String> autoConnectTargets = new ConcurrentHashMap<>();
 
   public PlayerConnectionHandler(ProxyServer proxyServer, VelocityPteroPower plugin) {
     this.proxyServer = proxyServer;
@@ -120,6 +121,7 @@ public class PlayerConnectionHandler {
     if (pending != null) {
       pending.cancelled = true;
     }
+    autoConnectTargets.remove(playerId);
     for (Map.Entry<String, Set<UUID>> entry : waitingPlayers.entrySet()) {
       Set<UUID> waiting = entry.getValue();
       if (waiting.remove(playerId)) {
@@ -248,6 +250,14 @@ public class PlayerConnectionHandler {
     }
 
     String serverId = serverInfo.getServerId();
+
+    if (serverName.equals(autoConnectTargets.get(player.getUniqueId()))) {
+      logger.debug(
+          "Allowing VPP auto-connect of {} to {} (server verified online).",
+          player.getUsername(),
+          serverName);
+      return;
+    }
 
     if (isPlayerOnCooldown(player, serverName) && event.getPreviousServer() != null) {
       event.setResult(ServerPreConnectEvent.ServerResult.denied());
@@ -948,7 +958,9 @@ public class PlayerConnectionHandler {
     }
 
     logger.info("Connecting player {} to server {}.", player.getUsername(), serverName);
+    autoConnectTargets.put(player.getUniqueId(), serverName);
     player.createConnectionRequest(targetServer).connect().whenComplete((result, throwable) -> {
+      autoConnectTargets.remove(player.getUniqueId(), serverName);
       if (!player.isActive()) {
         cancelPendingConnect(player.getUniqueId());
         return;
