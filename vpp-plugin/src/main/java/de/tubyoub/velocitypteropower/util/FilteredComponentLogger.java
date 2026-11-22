@@ -24,6 +24,8 @@ public class FilteredComponentLogger implements ComponentLogger {
     private volatile Level currentLevel; // Use volatile for thread safety
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
+    private static final String DEBUG_PREFIX = "[DEBUG] ";
+
     public FilteredComponentLogger(ComponentLogger delegate, Level initialLevel) {
         this.delegate = delegate;
         this.currentLevel = initialLevel;
@@ -504,35 +506,35 @@ public class FilteredComponentLogger implements ComponentLogger {
      @Override
     public void debug(String msg) {
         if (isDebugEnabled()) {
-            delegate.debug(msg);
+            if (delegate.isDebugEnabled()) delegate.debug(msg); else delegate.info(DEBUG_PREFIX + msg);
         }
     }
 
     @Override
     public void debug(String format, Object arg) {
         if (isDebugEnabled()) {
-            delegate.debug(format, arg);
+            if (delegate.isDebugEnabled()) delegate.debug(format, arg); else delegate.info(DEBUG_PREFIX + format, arg);
         }
     }
 
     @Override
     public void debug(String format, Object arg1, Object arg2) {
         if (isDebugEnabled()) {
-            delegate.debug(format, arg1, arg2);
+            if (delegate.isDebugEnabled()) delegate.debug(format, arg1, arg2); else delegate.info(DEBUG_PREFIX + format, arg1, arg2);
         }
     }
 
     @Override
     public void debug(String format, Object... arguments) {
         if (isDebugEnabled()) {
-            delegate.debug(format, arguments);
+            if (delegate.isDebugEnabled()) delegate.debug(format, arguments); else delegate.info(DEBUG_PREFIX + format, arguments);
         }
     }
 
     @Override
     public void debug(String msg, Throwable t) {
         if (isDebugEnabled()) {
-            delegate.debug(msg, t);
+            if (delegate.isDebugEnabled()) delegate.debug(msg, t); else delegate.info(DEBUG_PREFIX + msg, t);
         }
     }
 
