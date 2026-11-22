@@ -14,6 +14,8 @@
 > [!NOTE]
 > **About AI use in this project.** I built the automated test suite (the unit tests and the live panel E2E setup under `e2e/`) and wrote large parts of the documentation with the help of AI. I read and checked what went in, and the tests run against real Pterodactyl, Pelican and Calagopus panels. The plugin itself is still my project, and if something in the tests or docs looks wrong, please open an issue.
 
+> The Agents Cursor and Clause only have this many lines committed because i used them to commit large chunks of code i wrote over the last few months and then didnt commit myself and well lost track of it.
+
 VelocityPteroPower (VPP) connects your Velocity proxy to Pterodactyl, Pelican Panel, Calagopus or Mc Server Soft. It starts a game server when a player tries to join it and stops it again once nobody has played on it for a while.
 
 You need **Velocity 4.3+ and Java 25** on the proxy. Velocity 3.x is not supported since 0.9.6.
