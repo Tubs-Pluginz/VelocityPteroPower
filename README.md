@@ -75,7 +75,7 @@ Maven dependency:
 
 Official catalog: [`catalog/addons.json`](catalog/addons.json) (served from the `dev` branch by default). Operators can extend it with `addons.extraCatalogUrls` / `addons.extraEntries` in `config.yml`.
 
-- In-game install (`/ptero addon install …`) downloads from GitHub Release assets (`releases/latest/download/vpp-addon-….jar`). CI uploads those on each GitHub Release.
+- In-game install (`/ptero addon install …`) downloads from the rolling GitHub `nightly` prerelease (`releases/download/nightly/vpp-addon-….jar`). CI refreshes those jars on each nightly build.
 - Browser downloads and stats live on separate Modrinth projects (webhooks, scheduler, move-history). The sample addon is build-local only.
 - Dropping a JAR into `plugins/VelocityPteroPower/addons/` counts as installed in `/ptero addon browse` once it loads.
 

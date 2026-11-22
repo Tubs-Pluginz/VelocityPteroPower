@@ -1,0 +1,149 @@
+fileversion: 17
+checkUpdate: false
+languageOverride: en_US
+loggerLevel: 10
+apiThreads: 8
+printRateLimit: false
+
+serverStatusCheckMethod: "HYBRID"
+pingTimeout: 1500
+
+shutdownRetries: 2
+shutdownRetryDelay: 15
+idleStartShutdownTime: 60
+playerStartCooldown: 2
+
+startupInitialCheckDelay: 3
+startupPollInterval: 2
+startupTimeoutSeconds: 90
+startupTimeoutPolicy: CANCEL
+
+softRequeueGraceSeconds: 15
+softRequeueMaxAttempts: 2
+
+rateLimitBackgroundPauseThreshold: 5
+rateLimitProbeFallbackSeconds: 30
+
+persistentQueueEnabled: true
+persistentQueueTtlSeconds: 300
+
+panelWebSocketEnabled: true
+panelWebSocketRefreshSeconds: 30
+serverStateCacheTtlSeconds: 20
+
+maxOnlineReservations: 0
+queueWhenMaxOnline: true
+
+stopIdleIgnore:
+  - limbo
+  - lobby-1
+  - lobby-2
+
+serverNotFoundMessage: true
+whitelistAllowBypass: true
+whitelistCheckInterval: 5
+
+# Max 2 non-exempt game servers concurrently (limbo & lobbies exempt) so E2E can exercise queueing & bypass!
+maxOnlineServers: 2
+maxOnlineAllowBypass: true
+maxOnlineExempt:
+  - limbo
+  - lobby-1
+  - lobby-2
+countLobbiesInMaxOnline: false
+countLimbosInMaxOnline: false
+
+alwaysOnline:
+  - limbo
+alwaysOnlineCheckInterval: 15
+
+resourceCacheSeconds: 5
+resourcePrefetchEnabled: false
+idleShutdownCheckInterval: 10
+
+moveHistory:
+  enabled: true
+  maxEntriesPerPlayer: 50
+
+maintenance:
+  builtinEnabled: true
+  externalProvidersEnabled: true
+
+lifecycle:
+  shutdownOnProxyExit:
+    - survival
+    - skywars
+    - bedwars
+
+lobbyBalancer:
+  enableBuiltin: true
+  lobbies:
+    - lobby-1
+    - lobby-2
+  limbos:
+    - limbo
+  lobbiesToUse: 0
+  strategy: "ROUND_ROBIN"
+  healthCheckInterval: 10
+  minOnline: 1
+  maxOnline: 2
+  playersPerServer: 2
+  cpuScaleUpThreshold: 85.0
+  autoScaleEnabled: true
+  preStartThresholdPercent: 50
+  startFailureFallbackSeconds: 30
+  startFailureCooldownSeconds: 30
+  scaleDownEnabled: true
+  scaleDownIdleSeconds: 20
+  sendToLimboOnStart: true
+  forcedHostOfflineBehavior: LOBBY_OR_LIMBO
+
+pterodactyl:
+  url: "__PANEL_URL__"
+  apiKey: "__API_KEY__"
+
+servers:
+  limbo:
+    id: "__ID_LIMBO__"
+    timeout: -1
+    startupJoinDelay: 1
+    whitelist: false
+  lobby-1:
+    id: "__ID_LOBBY1__"
+    timeout: -1
+    startupJoinDelay: 2
+    whitelist: false
+  lobby-2:
+    id: "__ID_LOBBY2__"
+    timeout: -1
+    startupJoinDelay: 2
+    whitelist: false
+  survival:
+    id: "__ID_SURVIVAL__"
+    timeout: 12
+    startupJoinDelay: 2
+    whitelist: true
+  skywars:
+    id: "__ID_SKYWARS__"
+    timeout: 20
+    startupJoinDelay: 2
+    group: "minigames"
+    whitelist: false
+  bedwars:
+    id: "__ID_BEDWARS__"
+    timeout: 20
+    startupJoinDelay: 2
+    group: "minigames"
+    startPassword: "e2e-unlock-pass"
+    whitelist: false
+
+serverGroups:
+  minigames:
+    - skywars
+    - bedwars
+
+addons:
+  catalogUrl: "http://webhook-sink:19091/catalog/addons.json"
+  extraCatalogUrls: []
+  extraEntries: []
+  autoLoadOnStartup: true

@@ -7,7 +7,7 @@ Steps that actually help when VelocityPteroPower misbehaves.
 
 ## 1. Preliminary Checks ✅
 
-*   **Latest VPP:** Grab a current jar from [Modrinth](https://modrinth.com/plugin/velocitypteropower).
+*   **Latest VPP:** For 0.9.6 pre-release testing, grab the jar from the [GitHub nightly](https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/tag/nightly).
 *   **Velocity 4.3+ / Java 25:** 0.9.6 will not load on Velocity 3 or Java 21. Check `java -version` on the proxy host and `/velocity version`.
 
 ## 2. Enable debug logging 📝
@@ -153,7 +153,7 @@ This typically indicates a temporary issue with the HTTP/2 connection between yo
 
 **Checklist:**
 1.  Jars belong in `plugins/VelocityPteroPower/addons/` (not Velocity's root `plugins/`).
-2.  Catalog install pulls GitHub Release assets from `releases/latest` — the Release must exist and include the addon jar.
+2.  Catalog install pulls GitHub Release assets from the `nightly` prerelease — that release must exist and include the addon jar.
 3.  Browse treats a successfully loaded jar as installed even if you dropped it by hand.
 4.  Sample addon has no catalog download URL; build it locally if you need it.
 :::

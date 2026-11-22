@@ -236,6 +236,7 @@ public class PlayerConnectionHandler {
 
     if (!plugin.getWhitelistManager().isPlayerWhitelisted(serverName, player.getUsername())) {
       if (event.getPreviousServer() == null) {
+        event.setResult(ServerPreConnectEvent.ServerResult.denied());
         player.disconnect(
             messagesManager.prefixed(MessageKey.CONNECT_NOT_WHITELISTED));
         return;
@@ -248,6 +249,19 @@ public class PlayerConnectionHandler {
     }
 
     String serverId = serverInfo.getServerId();
+
+    // Allow VPP's own startup-wait / retry auto-transfer through without being blocked
+    // by alreadyManagingStart, playerStartCooldown, or consumed startPassword checks.
+    PendingConnect activePending = pendingConnects.get(player.getUniqueId());
+    if (activePending != null
+        && !activePending.cancelled
+        && activePending.serverName.equalsIgnoreCase(serverName)) {
+      logger.debug(
+          "Allowing VPP-initiated pending transfer for {} -> {}.",
+          player.getUsername(),
+          serverName);
+      return;
+    }
 
     if (isPlayerOnCooldown(player, serverName) && event.getPreviousServer() != null) {
       event.setResult(ServerPreConnectEvent.ServerResult.denied());
@@ -437,6 +451,9 @@ public class PlayerConnectionHandler {
       startInitiators.putIfAbsent(serverName, player.getUniqueId());
       plugin.getStartingServersSince().put(serverName, System.currentTimeMillis());
       playerCooldowns.put(player.getUniqueId(), System.currentTimeMillis());
+      if (plugin.getServerLifecycleManager() != null) {
+        plugin.getServerLifecycleManager().cancelScheduledShutdown(serverName, "cold start requested by " + player.getUsername());
+      }
       submitPlayerPowerStart(serverId);
       plugin.recordServerStartSignalSent();
       try {
@@ -613,11 +630,25 @@ public class PlayerConnectionHandler {
 
   private void scheduleDelayedConnect(
     Player player, String targetServerName, PteroServerInfo targetServerInfo) {
+    UUID playerId = player.getUniqueId();
+    // Remove player from any OTHER server's wait queue so switching targets
+    // doesn't leave an earlier server pulling them away later.
+    for (Map.Entry<String, Set<UUID>> entry : waitingPlayers.entrySet()) {
+      if (!entry.getKey().equalsIgnoreCase(targetServerName)
+          && entry.getValue().remove(playerId)) {
+        clearStartingStateIfEmpty(entry.getKey());
+      }
+    }
+    PendingConnect existingPending = pendingConnects.get(playerId);
+    if (existingPending != null && !existingPending.serverName.equalsIgnoreCase(targetServerName)) {
+      existingPending.cancelled = true;
+      pendingConnects.remove(playerId, existingPending);
+    }
     waitingPlayers
         .computeIfAbsent(targetServerName, k -> ConcurrentHashMap.newKeySet())
-        .add(player.getUniqueId());
+        .add(playerId);
     if (configurationManager.isPersistentQueueEnabled() && plugin.getPersistentQueueService() != null) {
-      plugin.getPersistentQueueService().remember(player.getUniqueId(), targetServerName);
+      plugin.getPersistentQueueService().remember(playerId, targetServerName);
     }
     ensureServerStartupWatcher(targetServerName, targetServerInfo);
   }
@@ -803,6 +834,9 @@ public class PlayerConnectionHandler {
       return false;
     }
     plugin.getStartingServersSince().put(serverName, System.currentTimeMillis());
+    if (plugin.getServerLifecycleManager() != null) {
+      plugin.getServerLifecycleManager().cancelScheduledShutdown(serverName, "queued capacity start");
+    }
     submitPlayerPowerStart(serverInfo.getServerId());
     plugin.recordServerStartSignalSent();
     try {

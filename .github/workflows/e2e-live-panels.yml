@@ -1,0 +1,73 @@
+name: Live Panel + Wings E2E Suite
+
+on:
+  schedule:
+    # Run nightly at 03:00 UTC against :latest Panels & :latest Wings
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      panel:
+        description: 'Live panel to test'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - pterodactyl
+          - pelican
+          - calagopus
+
+jobs:
+  build-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Package plugin, addons, and test bridge
+        run: mvn -B -DskipTests package --file pom.xml
+
+      - name: Upload built JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: vpp-e2e-jars
+          path: |
+            vpp-plugin/target/velocitypteropower-*-shaded.jar
+            vpp-test-bridge/target/vpp-test-bridge-*.jar
+            addons/*/target/vpp-addon-*.jar
+          retention-days: 1
+
+  live-panel-e2e:
+    needs: build-plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        panel: ${{ (inputs.panel == null || inputs.panel == 'all') && fromJson('["pterodactyl","pelican","calagopus"]') || fromJson(format('["{0}"]', inputs.panel)) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download built JARs
+        uses: actions/download-artifact@v4
+        with:
+          name: vpp-e2e-jars
+
+      - name: Run Live ${{ matrix.panel }} + Live Wings + Automated MC Client E2E
+        run: |
+          chmod +x e2e/run-live-e2e.sh e2e/scripts/render-configs.sh e2e/panels/*/provision.sh e2e/velocity/entrypoint.sh
+          ./e2e/run-live-e2e.sh "${{ matrix.panel }}" --skip-build
+
+      - name: Upload versioned E2E report & logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vpp-live-e2e-report-${{ matrix.panel }}
+          path: e2e/reports/
+          retention-days: 30

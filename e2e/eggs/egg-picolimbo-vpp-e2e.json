@@ -1,0 +1,42 @@
+{
+  "_comment": "VelocityPteroPower Live E2E Egg (PTDL_v2) — PicoLimbo with Velocity Modern Forwarding + Real Whitelist",
+  "meta": {
+    "version": "PTDL_v2",
+    "update_url": null
+  },
+  "exported_at": "2026-01-01T00:00:00+00:00",
+  "name": "PicoLimbo VPP E2E",
+  "author": "vpp-e2e@pluginz.dev",
+  "description": "Lightweight Rust Minecraft backend (PicoLimbo) preconfigured with Velocity Modern Forwarding and whitelist.json for automated VelocityPteroPower E2E testing.",
+  "features": null,
+  "docker_images": {
+    "Alpine (ghcr.io/parkervcp/yolks:alpine)": "ghcr.io/parkervcp/yolks:alpine"
+  },
+  "file_denylist": [],
+  "startup": "./start.sh",
+  "config": {
+    "files": "{}",
+    "startup": "{\n    \"done\": \"Listening on:\"\n}",
+    "logs": "{}",
+    "stop": "^C"
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/sh\nset -eu\napk add --no-cache curl jq\n\nUNAME_M=\"$(uname -m)\"\ncase \"$UNAME_M\" in\n  x86_64)  ARCH='x86_64' ;;\n  aarch64) ARCH='aarch64' ;;\n  *) echo \"Unsupported arch: $UNAME_M\" >&2; exit 1 ;;\nesac\n\nGITHUB_PACKAGE=\"Quozul/PicoLimbo\"\nPATTERN=\"pico_limbo_linux-${ARCH}-musl[.]tar[.]gz\"\n\nALL_JSON=\"$(curl -fsSL \"https://api.github.com/repos/${GITHUB_PACKAGE}/releases\")\"\nLATEST_JSON=\"$(printf '%s\\n' \"$ALL_JSON\" | jq 'map(select(.prerelease==false)) | sort_by(.published_at) | reverse | .[0]')\"\nTAG_NAME=\"$(printf '%s\\n' \"$LATEST_JSON\" | jq -r '.tag_name')\"\nDOWNLOAD_URL=\"$(printf '%s\\n' \"$LATEST_JSON\" | jq -r --arg pat \"$PATTERN\" '.assets[].browser_download_url | select(test($pat))' | head -n1)\"\n\nif [ -z \"$DOWNLOAD_URL\" ]; then\n  echo \"Failed to resolve PicoLimbo download URL for arch=$ARCH\" >&2\n  exit 1\nfi\n\nmkdir -p /mnt/server\ncd /mnt/server\n\nARCHIVE=\"${DOWNLOAD_URL##*/}\"\necho \"Downloading PicoLimbo ${TAG_NAME} (${ARCHIVE})...\"\ncurl -fsSL -o \"$ARCHIVE\" \"$DOWNLOAD_URL\"\ntar -xzf \"$ARCHIVE\"\nrm -f \"$ARCHIVE\"\nchmod +x pico_limbo\nprintf '%s\\n' \"$TAG_NAME\" > picolimbo-version.txt\n\nFORWARDING_SECRET=\"${VELOCITY_SECRET:-vpp-e2e-forwarding-secret}\"\ncat > server.toml <<EOF\nbind = \"0.0.0.0:25565\"\n\n[forwarding]\nmethod = \"MODERN\"\nsecret = \"${FORWARDING_SECRET}\"\nEOF\n\ncat > start.sh <<'EOF'\n#!/bin/sh\nset -eu\nsed -i \"s|^bind = .*|bind = \\\"0.0.0.0:${SERVER_PORT:-25565}\\\"|\" server.toml\nexec ./pico_limbo\nEOF\nchmod +x start.sh\n\ncat > whitelist.json <<'EOF'\n[\n  {\n    \"uuid\": \"00000000-0000-3000-8000-000000000001\",\n    \"name\": \"Alice\"\n  },\n  {\n    \"uuid\": \"00000000-0000-3000-8000-000000000002\",\n    \"name\": \"Bob\"\n  },\n  {\n    \"uuid\": \"00000000-0000-3000-8000-000000000003\",\n    \"name\": \"Admin\"\n  }\n]\nEOF\n\necho \"Installed PicoLimbo ${TAG_NAME} with Velocity Modern Forwarding + whitelist.json\"",
+      "container": "ghcr.io/parkervcp/installers:alpine",
+      "entrypoint": "ash"
+    }
+  },
+  "variables": [
+    {
+      "name": "Velocity Forwarding Secret",
+      "description": "Shared secret matching Velocity's forwarding.secret",
+      "env_variable": "VELOCITY_SECRET",
+      "default_value": "vpp-e2e-forwarding-secret",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "string|required",
+      "field_type": "text"
+    }
+  ]
+}

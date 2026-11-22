@@ -116,3 +116,8 @@ run/
 VPP workflows.md
 
 .cursor/
+
+# Live E2E runtime state & generated reports
+e2e/.state/
+e2e/reports/
+e2e/runner/node_modules/

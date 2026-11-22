@@ -44,6 +44,7 @@
     <module>addons/webhooks</module>
     <module>addons/scheduler</module>
     <module>addons/move-history</module>
+    <module>vpp-test-bridge</module>
   </modules>
 
   <properties>
@@ -71,6 +72,11 @@
     <source.plugin.version>3.3.1</source.plugin.version>
     <gpg.plugin.version>3.2.8</gpg.plugin.version>
     <central.plugin.version>0.9.0</central.plugin.version>
+    <surefire.plugin.version>3.5.2</surefire.plugin.version>
+    <junit.version>5.11.4</junit.version>
+    <mockito.version>5.24.0</mockito.version>
+    <assertj.version>3.27.3</assertj.version>
+    <awaitility.version>4.2.2</awaitility.version>
   </properties>
 
   <dependencyManagement>
@@ -99,6 +105,36 @@
         <groupId>net.kyori</groupId>
         <artifactId>adventure-text-minimessage</artifactId>
         <version>${minimessage.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${junit.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <version>${mockito.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-junit-jupiter</artifactId>
+        <version>${mockito.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>${assertj.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.awaitility</groupId>
+        <artifactId>awaitility</artifactId>
+        <version>${awaitility.version}</version>
+        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -140,6 +176,14 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-deploy-plugin</artifactId>
           <version>${deploy.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${surefire.plugin.version}</version>
+          <configuration>
+            <argLine>-XX:+EnableDynamicAgentLoading</argLine>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>

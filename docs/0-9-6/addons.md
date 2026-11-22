@@ -25,11 +25,11 @@ Data: `plugins/VelocityPteroPower/addons/data/{addonId}/`
 
 ## Install paths
 
-**In-game (catalog)** — `/ptero addon install <id>` downloads from GitHub Release assets:
+**In-game (catalog)** — `/ptero addon install <id>` downloads from the rolling GitHub `nightly` prerelease:
 
-`https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/latest/download/vpp-addon-….jar`
+`https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/download/nightly/vpp-addon-….jar`
 
-CI uploads those jars when a GitHub Release is published. You do not hand-upload catalog files.
+CI refreshes that release (plugin + official addons) on each build. You do not hand-upload catalog files.
 
 **Browser** — use the Modrinth project pages above if you want download stats split per addon. Drop the jar into the addons folder yourself.
 

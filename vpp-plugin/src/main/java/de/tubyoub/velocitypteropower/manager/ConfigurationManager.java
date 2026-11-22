@@ -178,6 +178,7 @@ public class ConfigurationManager {
                                         .addIgnoredRoute("15", "profiles", '.')
                                         .addIgnoredRoute("16", "servers", '.')
                                         .addIgnoredRoute("16", "profiles", '.')
+                                        .addIgnoredRoute("17", "profiles", '.')
                                         .build());
 
 
@@ -305,13 +306,13 @@ public class ConfigurationManager {
             Section addonsSec = config.getSection("addons");
             if (addonsSec != null) {
                 addonCatalogUrl = addonsSec.getString("catalogUrl",
-                        "https://raw.githubusercontent.com/Tubs-Pluginz/VelocityPteroPower/dev/catalog/addons.json");
+                        "https://raw.githubusercontent.com/Tubs-Pluginz/VelocityPteroPower/0.9.6-rework/catalog/addons.json");
                 addonExtraCatalogUrls = addonsSec.getStringList("extraCatalogUrls");
                 if (addonExtraCatalogUrls == null) addonExtraCatalogUrls = Collections.emptyList();
                 addonAutoLoadOnStartup = addonsSec.getBoolean("autoLoadOnStartup", true);
                 addonExtraEntries = parseAddonExtraEntries(addonsSec);
             } else {
-                addonCatalogUrl = "https://raw.githubusercontent.com/Tubs-Pluginz/VelocityPteroPower/dev/catalog/addons.json";
+                addonCatalogUrl = "https://raw.githubusercontent.com/Tubs-Pluginz/VelocityPteroPower/0.9.6-rework/catalog/addons.json";
                 addonExtraCatalogUrls = Collections.emptyList();
                 addonExtraEntries = Collections.emptyList();
                 addonAutoLoadOnStartup = true;

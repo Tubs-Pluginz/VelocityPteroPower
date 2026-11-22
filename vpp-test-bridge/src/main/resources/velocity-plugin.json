@@ -1,0 +1,14 @@
+{
+  "id": "vpp-test-bridge",
+  "name": "VPP Test Bridge",
+  "version": "${project.version}",
+  "description": "Test-only HTTP bridge for automated VelocityPteroPower E2E tests.",
+  "authors": ["VelocityPteroPower E2E"],
+  "main": "de.tubyoub.vpp.testbridge.VppTestBridgePlugin",
+  "dependencies": [
+    {
+      "id": "velocity-ptero-power",
+      "optional": true
+    }
+  ]
+}

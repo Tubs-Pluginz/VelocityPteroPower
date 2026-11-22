@@ -14,7 +14,7 @@ Velocity 3.x and Java 21 will not work with 0.9.6.
 
 ## Steps
 
-1. **Download** the shaded jar from [Modrinth](https://modrinth.com/plugin/velocitypteropower) or [GitHub Releases](https://github.com/Tubs-Pluginz/VelocityPteroPower/releases). Use `velocitypteropower-*-shaded.jar` when both jars are present.
+1. **Download** the current pre-release jar from the rolling [GitHub nightly](https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/tag/nightly) (`velocitypteropower-0.9.6-alpha-*.jar`). Stable Modrinth / non-nightly GitHub releases are still on 0.9.5 until 0.9.6 ships.
 
 2. **Drop it** into the Velocity `plugins/` folder.
 

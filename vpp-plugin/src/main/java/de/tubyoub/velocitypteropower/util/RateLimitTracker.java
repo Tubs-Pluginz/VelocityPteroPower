@@ -133,13 +133,20 @@ public class RateLimitTracker {
                 }
             });
 
-            remainingHeader.ifPresent(remainingStr -> {
+            if (remainingHeader.isPresent()) {
+                String remainingStr = remainingHeader.get();
                 try {
                     remainingRequests.set(Integer.parseInt(remainingStr));
                 } catch (NumberFormatException e) {
                     logger.warn("Failed to parse X-RateLimit-Remaining header: {}", remainingStr);
                 }
-            });
+            } else if (response.statusCode() == 429) {
+                remainingRequests.set(0);
+            } else {
+                // Panel does not advertise X-RateLimit-Remaining headers (e.g. Calagopus);
+                // restore optimistic consumeOne() so we never self-exhaust to 0.
+                remainingRequests.updateAndGet(v -> Math.min(rateLimit.get(), v + 1));
+            }
 
             if (resetHeader.isPresent()) {
                 try {

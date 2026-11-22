@@ -37,6 +37,8 @@ public class ServerLifecycleManager {
   private final Map<String, Integer> shutdownRetryCounts = new ConcurrentHashMap<>();
   // Track scheduled shutdown tasks centrally to avoid duplicates between listeners and periodic sweep
   private final Map<String, ScheduledTask> scheduledShutdowns = new ConcurrentHashMap<>();
+  // Track pending post-stop confirmation checks so a subsequent start or player join cancels stale retries
+  private final Map<String, ScheduledTask> shutdownConfirmations = new ConcurrentHashMap<>();
 
   /**
    * Constructor for ServerLifecycleManager.
@@ -136,6 +138,11 @@ public class ServerLifecycleManager {
 
   public void cancelScheduledShutdown(String serverName, String reason) {
     ScheduledTask existing = scheduledShutdowns.remove(serverName);
+    ScheduledTask confirmation = shutdownConfirmations.remove(serverName);
+    if (confirmation != null) {
+      confirmation.cancel();
+      clearRetryCount(serverName);
+    }
     if (existing != null) {
       existing.cancel();
       clearRetryCount(serverName);
@@ -144,6 +151,8 @@ public class ServerLifecycleManager {
           messages.mm(
               MessageKey.SERVER_SHUTDOWN_CANCELLED,
               Map.of("server", serverName, "reason", reason)));
+    } else if (confirmation != null) {
+      logger.debug("Cancelled pending shutdown confirmation check for '{}' ({}).", serverName, reason);
     } else {
       logger.debug("No pending shutdown task found for server '{}' to cancel.", serverName);
     }
@@ -211,14 +220,39 @@ public class ServerLifecycleManager {
    */
   private void scheduleShutdownConfirmationCheck(String serverName, String serverId) {
     long retryDelay = configurationManager.getShutdownRetryDelay();
+    ScheduledTask prev = shutdownConfirmations.remove(serverName);
+    if (prev != null) {
+      prev.cancel();
+    }
 
-    proxyServer
+    ScheduledTask task = proxyServer
         .getScheduler()
         .buildTask(
             plugin,
             new Runnable() {
               @Override
               public void run() {
+                shutdownConfirmations.remove(serverName);
+                // Abort stale confirmation retries if a player is now starting/waiting for this server
+                if (plugin.getPlayerConnectionHandler() != null
+                    && !plugin.getPlayerConnectionHandler().isSafeToIdleStop(serverName)) {
+                  logger.info(
+                      "Shutdown confirmation for '{}' cancelled — server is starting or has waiting players.",
+                      serverName);
+                  shutdownRetryCounts.remove(serverName);
+                  return;
+                }
+                try {
+                  if (plugin.getServerGroupService() != null
+                      && plugin.getServerGroupService().groupHasPlayers(serverName)) {
+                    logger.debug(
+                        "Shutdown confirmation for '{}' cancelled — group peer has players.",
+                        serverName);
+                    shutdownRetryCounts.remove(serverName);
+                    return;
+                  }
+                } catch (Exception ignored) {}
+
                 if (!rateLimitTracker.canMakeRequest()) {
                   logger.debug("Could not confirm shutdown status for {} due to rate limit. Rescheduling.", serverName);
                   reschedule();
@@ -267,15 +301,21 @@ public class ServerLifecycleManager {
               }
 
               private void reschedule() {
-                proxyServer
+                ScheduledTask next = proxyServer
                     .getScheduler()
                     .buildTask(plugin, this)
                     .delay(retryDelay, TimeUnit.SECONDS)
                     .schedule();
+                if (next != null) {
+                  shutdownConfirmations.put(serverName, next);
+                }
               }
             })
         .delay(retryDelay, TimeUnit.SECONDS)
         .schedule();
+    if (task != null) {
+      shutdownConfirmations.put(serverName, task);
+    }
   }
 
   /**

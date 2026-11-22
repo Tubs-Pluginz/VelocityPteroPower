@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.tubyoub</groupId>
+    <artifactId>velocitypteropower-parent</artifactId>
+    <version>0.9.6-alpha</version>
+  </parent>
+
+  <artifactId>vpp-test-bridge</artifactId>
+  <packaging>jar</packaging>
+  <name>VelocityPteroPower E2E Test Bridge</name>
+  <description>Test-only Velocity plugin exposing an HTTP control and inspection API for live E2E suites</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.velocitypowered</groupId>
+      <artifactId>velocity-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>de.tubyoub</groupId>
+      <artifactId>vpp-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>de.tubyoub</groupId>
+      <artifactId>velocitypteropower</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>${project.basedir}/src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+  </build>
+</project>

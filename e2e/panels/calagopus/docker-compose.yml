@@ -1,0 +1,130 @@
+name: vpp-e2e-calagopus
+
+services:
+  db:
+    image: calagopus/pgautoupgrade:18-alpine
+    environment:
+      TZ: "UTC"
+      POSTGRES_USER: panel
+      POSTGRES_PASSWORD: vpp_panel_password
+      POSTGRES_DB: panel
+      PGDATA: /data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U panel -d panel"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      - vpp-net
+
+  cache:
+    image: calagopus/valkey:latest
+    command: --protected-mode no --save 60 1
+    environment:
+      TZ: "UTC"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - vpp-net
+
+  panel:
+    image: calagopus/panel:aio
+    pull_policy: always
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    environment:
+      TZ: "UTC"
+      REDIS_URL: "redis://cache"
+      DATABASE_URL: "postgresql://panel:vpp_panel_password@db/panel"
+      DATABASE_MIGRATE: "true"
+      PORT: "8000"
+      AIO_BASE_WINGS_CONFIGURATION: "/wings-config.yml"
+      APP_DEBUG: "false"
+      APP_LOG_DIRECTORY: "/var/log/calagopus"
+      APP_PRIMARY: "true"
+      APP_ENABLE_WINGS_PROXY: "true"
+      APP_ENCRYPTION_KEY: "vpp-e2e-calagopus-encryption-key-32b"
+      APP_USE_DECRYPTION_CACHE: "true"
+      APP_USE_INTERNAL_CACHE: "true"
+    volumes:
+      - "${E2E_STATE_DIR}/calagopus-data:/var/lib/calagopus"
+      - "${E2E_STATE_DIR}/calagopus-logs:/var/log/calagopus"
+      - "${E2E_STATE_DIR}/wings-config.yml:/wings-config.yml"
+      - "${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock"
+      - "/var/lib/docker/containers/:/var/lib/docker/containers/"
+      - "${E2E_STATE_DIR}/calagopus-wings-etc:/etc/calagopus-wings"
+      - "/tmp/vpp-e2e-calagopus-wings:/tmp/vpp-e2e-calagopus-wings"
+      - "/run/wings:/run/wings"
+      - "${E2E_STATE_DIR}/calagopus-wings-logs:/var/log/calagopus-wings"
+      - ../../eggs/egg-picolimbo-vpp-e2e.json:/provision/egg-picolimbo-vpp-e2e.json:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "18084:8000"
+    networks:
+      - vpp-net
+
+  webhook-sink:
+    build:
+      context: ../../runner
+    command: ["webhook-sink.mjs"]
+    volumes:
+      - ../../../catalog:/catalog:ro
+      - "${E2E_ARTIFACTS_DIR}:/artifacts:ro"
+    networks:
+      - vpp-net
+
+  velocity:
+    build:
+      context: ../../velocity
+    depends_on:
+      - panel
+      - webhook-sink
+    environment:
+      SHARED_DIR: /shared
+      PLUGINS_SRC: /artifacts
+      VPP_TEST_BRIDGE_PORT: "19090"
+    volumes:
+      - "${E2E_STATE_DIR}/shared:/shared"
+      - "${E2E_ARTIFACTS_DIR}:/artifacts:ro"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "25577:25577"
+      - "19090:19090"
+    networks:
+      - vpp-net
+
+  runner:
+    build:
+      context: ../../runner
+    profiles: ["run"]
+    depends_on:
+      - velocity
+      - webhook-sink
+    environment:
+      PANEL_TYPE: "calagopus"
+      PANEL_URL: "http://panel:8000"
+      PANEL_API_KEY: "${PANEL_API_KEY:-}"
+      VELOCITY_HOST: "velocity"
+      VELOCITY_PORT: "25577"
+      BRIDGE_URL: "http://velocity:19090"
+      WEBHOOK_SINK_URL: "http://webhook-sink:19091"
+      MC_VERSION: "${MC_VERSION:-1.21.4}"
+      SHARED_DIR: "/shared"
+      RESULTS_DIR: "/results"
+    volumes:
+      - "${E2E_STATE_DIR}/shared:/shared:ro"
+      - "${E2E_RESULTS_DIR}:/results"
+    networks:
+      - vpp-net
+
+networks:
+  vpp-net:
+    name: vpp-e2e-calagopus-net

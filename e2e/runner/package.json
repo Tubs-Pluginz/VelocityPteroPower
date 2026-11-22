@@ -1,0 +1,10 @@
+{
+  "name": "vpp-live-e2e-runner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Automated headless Minecraft client test runner and versioned report generator for VelocityPteroPower",
+  "dependencies": {
+    "minecraft-protocol": "^1.51.0"
+  }
+}
