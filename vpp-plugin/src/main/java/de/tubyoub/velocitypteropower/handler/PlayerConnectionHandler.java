@@ -2,6 +2,7 @@ package de.tubyoub.velocitypteropower.handler;
 
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.player.ServerPreConnectEvent;
+import com.velocitypowered.api.network.ProtocolState;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ConnectionRequestBuilder;
@@ -611,6 +612,14 @@ public class PlayerConnectionHandler {
     } catch (Exception ignored) {}
   }
 
+  private static String plainText(Component component) {
+    try {
+      return PlainTextComponentSerializer.plainText().serialize(component);
+    } catch (Exception e) {
+      return String.valueOf(component);
+    }
+  }
+
   private static boolean isBlankReason(Component reason) {
     if (reason == null) return true;
     try {
@@ -957,7 +966,22 @@ public class PlayerConnectionHandler {
       return;
     }
 
+    ProtocolState state = player.getProtocolState();
+    if (player.getCurrentServer().isEmpty() || state != ProtocolState.PLAY) {
+      scheduleConnectRetry(player, serverName, pending,
+          "player not ready (state=" + state + ", server="
+              + player.getCurrentServer().map(cs -> cs.getServerInfo().getName()).orElse("none") + ")");
+      return;
+    }
+
     logger.info("Connecting player {} to server {}.", player.getUsername(), serverName);
+    logger.debug(
+        "Connect request for {}: from={}, state={}, attempt={}, fromStartupWait={}",
+        player.getUsername(),
+        player.getCurrentServer().map(cs -> cs.getServerInfo().getName()).orElse("none"),
+        state,
+        pending.retryCount + 1,
+        fromStartupWait);
     autoConnectTargets.put(player.getUniqueId(), serverName);
     player.createConnectionRequest(targetServer).connect().whenComplete((result, throwable) -> {
       autoConnectTargets.remove(player.getUniqueId(), serverName);
@@ -972,6 +996,11 @@ public class PlayerConnectionHandler {
       }
 
       if (throwable != null) {
+        logger.warn(
+            "Connect request for {} -> {} failed with exception: {}",
+            player.getUsername(),
+            serverName,
+            throwable.toString());
         scheduleConnectRetry(player, serverName, current, "exception: " + throwable);
         return;
       }
@@ -981,6 +1010,14 @@ public class PlayerConnectionHandler {
       }
 
       ConnectionRequestBuilder.Status status = result.getStatus();
+      if (status != ConnectionRequestBuilder.Status.SUCCESS) {
+        logger.info(
+            "Connect result for {} -> {}: {} (reason: {})",
+            player.getUsername(),
+            serverName,
+            status,
+            result.getReasonComponent().map(PlayerConnectionHandler::plainText).orElse("none"));
+      }
       switch (status) {
         case SUCCESS -> {
           logger.info("{} moved to {}", player.getUsername(), serverName);
@@ -1103,11 +1140,12 @@ public class PlayerConnectionHandler {
       removeWaitingPlayer(player.getUniqueId(), serverName);
       return;
     }
-    logger.debug(
-        "Connect failed for {} to {} ({}). Retrying shortly ({}/{}).",
-        player.getUsername(),
+    logger.info(
+        "Connect to {} for {} not completed ({}). Retrying in {}s ({}/{}).",
         serverName,
+        player.getUsername(),
         reason,
+        CONNECT_RETRY_DELAY_SECONDS,
         pending.retryCount,
         MAX_CONNECT_RETRIES);
     proxyServer
