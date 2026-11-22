@@ -55,7 +55,7 @@ jobs:
             --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
 
           SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
-          BASE_VERSION=$(echo "$POM_VERSION" | sed -E 's/-(alpha|snapshot|SNAPSHOT|rc[0-9]+)$//')
+          BASE_VERSION=$(echo "$POM_VERSION" | sed -E 's/-(alpha|beta|snapshot|SNAPSHOT|rc[0-9]+)$//')
           NEW_VERSION="${BASE_VERSION}-alpha-${SHORT_SHA}"
 
           echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"

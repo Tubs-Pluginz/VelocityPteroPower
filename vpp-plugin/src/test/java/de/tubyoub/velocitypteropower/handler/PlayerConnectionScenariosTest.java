@@ -430,6 +430,12 @@ class PlayerConnectionScenariosTest {
         when(result.getReasonComponent()).thenReturn(Optional.ofNullable(reason));
         when(builder.connect()).thenReturn(CompletableFuture.completedFuture(result));
         when(p.createConnectionRequest(survival)).thenReturn(builder);
+        // The auto-connect only fires once the player sits on a holding server in PLAY state.
+        ServerConnection holding = mock(ServerConnection.class);
+        when(holding.getServer()).thenReturn(limbo);
+        when(holding.getServerInfo()).thenReturn(new ServerInfo("limbo", new InetSocketAddress("127.0.0.1", 25566)));
+        when(p.getCurrentServer()).thenReturn(Optional.of(holding));
+        when(p.getProtocolState()).thenReturn(com.velocitypowered.api.network.ProtocolState.PLAY);
     }
 
     @Test

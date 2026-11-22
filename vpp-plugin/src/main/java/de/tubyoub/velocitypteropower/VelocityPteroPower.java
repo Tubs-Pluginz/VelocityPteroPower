@@ -35,7 +35,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class VelocityPteroPower {
-    private static final String VERSION = "0.9.6-alpha";
+    private static final String VERSION = "0.9.6-beta";
     private static final String MODRINTH_PROJECT_ID = "1dDr5J4w";
     private static final int BSTATS_PLUGIN_ID = 21465;
 

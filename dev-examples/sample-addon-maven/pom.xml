@@ -17,7 +17,7 @@
         <maven.compiler.target>25</maven.compiler.target>
         <maven.compiler.release>25</maven.compiler.release>
         <velocity.api.version>4.3.0</velocity.api.version>
-        <vpp.api.version>0.9.6-alpha</vpp.api.version>
+        <vpp.api.version>0.9.6-beta</vpp.api.version>
         <vpp.local.api.jar>${project.basedir}/../../vpp-api/target/vpp-api-${vpp.api.version}.jar</vpp.local.api.jar>
     </properties>
 

@@ -61,7 +61,7 @@ class UpdateServiceTest {
     @Test
     void checkUpdateFalseNeverContactsModrinth() {
         when(config.isCheckUpdate()).thenReturn(false);
-        UpdateService svc = new UpdateService(mock(ComponentLogger.class), config, "0.9.6-alpha", "vpp");
+        UpdateService svc = new UpdateService(mock(ComponentLogger.class), config, "0.9.6-beta", "vpp");
         svc.performUpdateCheck();
         assertThat(requests).isEmpty();
         assertThat(svc.getLastCheckedVersionInfo()).isNull();
@@ -71,7 +71,7 @@ class UpdateServiceTest {
     void checkUpdateTrueReportsANewerRelease() {
         when(config.isCheckUpdate()).thenReturn(true);
         body.set(version("0.9.7", "release", "Bug fixes"));
-        UpdateService svc = new UpdateService(mock(ComponentLogger.class), config, "0.9.6-alpha", "vpp");
+        UpdateService svc = new UpdateService(mock(ComponentLogger.class), config, "0.9.6-beta", "vpp");
         svc.performUpdateCheck();
 
         assertThat(requests).containsExactly("/v2/project/vpp/version");

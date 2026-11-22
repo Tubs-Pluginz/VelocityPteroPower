@@ -7,7 +7,7 @@
   <parent>
     <groupId>de.tubyoub</groupId>
     <artifactId>velocitypteropower-parent</artifactId>
-    <version>0.9.6-alpha</version>
+    <version>0.9.6-beta</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
