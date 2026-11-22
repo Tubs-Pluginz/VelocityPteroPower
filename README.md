@@ -12,7 +12,7 @@
 </p>
 
 > [!NOTE]
-> **About AI use in this project.** I built the automated test suite (the unit tests and the live panel E2E setup under `e2e/`) and wrote large parts of the documentation with the help of AI. I read and checked what went in, and the tests run against real Pterodactyl, Pelican and Calagopus panels, but I'd rather tell you than have you guess. The plugin itself is still my project, and if something in the tests or docs looks wrong, please open an issue.
+> **About AI use in this project.** I built the automated test suite (the unit tests and the live panel E2E setup under `e2e/`) and wrote large parts of the documentation with the help of AI. I read and checked what went in, and the tests run against real Pterodactyl, Pelican and Calagopus panels. The plugin itself is still my project, and if something in the tests or docs looks wrong, please open an issue.
 
 VelocityPteroPower (VPP) connects your Velocity proxy to Pterodactyl, Pelican Panel, Calagopus or Mc Server Soft. It starts a game server when a player tries to join it and stops it again once nobody has played on it for a while.
 
