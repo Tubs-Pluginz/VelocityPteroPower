@@ -2,6 +2,7 @@ package de.tubyoub.velocitypteropower.handler;
 
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.player.ServerPreConnectEvent;
+import com.velocitypowered.api.network.ProtocolState;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ConnectionRequestBuilder;
@@ -75,6 +76,7 @@ public class PlayerConnectionHandler {
   private final Set<String> settlingServers = ConcurrentHashMap.newKeySet();
   /** Servers someone actually joined since their last cold start (idleStartShutdownTime must not fire). */
   private final Set<String> joinedSinceColdStart = ConcurrentHashMap.newKeySet();
+  private final Map<UUID, String> autoConnectTargets = new ConcurrentHashMap<>();
 
   public PlayerConnectionHandler(ProxyServer proxyServer, VelocityPteroPower plugin) {
     this.proxyServer = proxyServer;
@@ -125,6 +127,7 @@ public class PlayerConnectionHandler {
     if (pending != null) {
       pending.cancelled = true;
     }
+    autoConnectTargets.remove(playerId);
     for (Map.Entry<String, Set<UUID>> entry : waitingPlayers.entrySet()) {
       Set<UUID> waiting = entry.getValue();
       if (waiting.remove(playerId)) {
@@ -275,14 +278,17 @@ public class PlayerConnectionHandler {
 
     String serverId = serverInfo.getServerId();
 
-    // Allow VPP's own startup-wait / retry auto-transfer through without being blocked
+    // Allow VPP's own startup-wait / retry / auto-connect transfer through without being blocked
     // by alreadyManagingStart, playerStartCooldown, or consumed startPassword checks.
     PendingConnect activePending = pendingConnects.get(player.getUniqueId());
-    if (activePending != null
-        && !activePending.cancelled
-        && activePending.serverName.equalsIgnoreCase(serverName)) {
+    boolean vppInitiated =
+        (activePending != null
+                && !activePending.cancelled
+                && activePending.serverName.equalsIgnoreCase(serverName))
+            || serverName.equals(autoConnectTargets.get(player.getUniqueId()));
+    if (vppInitiated) {
       logger.debug(
-          "Allowing VPP-initiated pending transfer for {} -> {}.",
+          "Allowing VPP-initiated transfer for {} -> {}.",
           player.getUsername(),
           serverName);
       return;
@@ -645,6 +651,14 @@ public class PlayerConnectionHandler {
         lts.record(player, limbo, LimboReason.MAINTENANCE_WAIT, serverName);
       }
     } catch (Exception ignored) {}
+  }
+
+  private static String plainText(Component component) {
+    try {
+      return PlainTextComponentSerializer.plainText().serialize(component);
+    } catch (Exception e) {
+      return String.valueOf(component);
+    }
   }
 
   private static boolean isBlankReason(Component reason) {
@@ -1036,8 +1050,25 @@ public class PlayerConnectionHandler {
       return;
     }
 
+    ProtocolState state = player.getProtocolState();
+    if (player.getCurrentServer().isEmpty() || state != ProtocolState.PLAY) {
+      scheduleConnectRetry(player, serverName, pending,
+          "player not ready (state=" + state + ", server="
+              + player.getCurrentServer().map(cs -> cs.getServerInfo().getName()).orElse("none") + ")");
+      return;
+    }
+
     logger.info("Connecting player {} to server {}.", player.getUsername(), serverName);
+    logger.debug(
+        "Connect request for {}: from={}, state={}, attempt={}, fromStartupWait={}",
+        player.getUsername(),
+        player.getCurrentServer().map(cs -> cs.getServerInfo().getName()).orElse("none"),
+        state,
+        pending.retryCount + 1,
+        fromStartupWait);
+    autoConnectTargets.put(player.getUniqueId(), serverName);
     player.createConnectionRequest(targetServer).connect().whenComplete((result, throwable) -> {
+      autoConnectTargets.remove(player.getUniqueId(), serverName);
       if (!player.isActive()) {
         cancelPendingConnect(player.getUniqueId());
         return;
@@ -1049,6 +1080,11 @@ public class PlayerConnectionHandler {
       }
 
       if (throwable != null) {
+        logger.warn(
+            "Connect request for {} -> {} failed with exception: {}",
+            player.getUsername(),
+            serverName,
+            throwable.toString());
         scheduleConnectRetry(player, serverName, current, "exception: " + throwable);
         return;
       }
@@ -1058,6 +1094,14 @@ public class PlayerConnectionHandler {
       }
 
       ConnectionRequestBuilder.Status status = result.getStatus();
+      if (status != ConnectionRequestBuilder.Status.SUCCESS) {
+        logger.info(
+            "Connect result for {} -> {}: {} (reason: {})",
+            player.getUsername(),
+            serverName,
+            status,
+            result.getReasonComponent().map(PlayerConnectionHandler::plainText).orElse("none"));
+      }
       switch (status) {
         case SUCCESS -> {
           joinedSinceColdStart.add(serverName);
@@ -1185,11 +1229,12 @@ public class PlayerConnectionHandler {
       removeWaitingPlayer(player.getUniqueId(), serverName);
       return;
     }
-    logger.debug(
-        "Connect failed for {} to {} ({}). Retrying shortly ({}/{}).",
-        player.getUsername(),
+    logger.info(
+        "Connect to {} for {} not completed ({}). Retrying in {}s ({}/{}).",
         serverName,
+        player.getUsername(),
         reason,
+        CONNECT_RETRY_DELAY_SECONDS,
         pending.retryCount,
         MAX_CONNECT_RETRIES);
     proxyServer
