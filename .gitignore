@@ -111,5 +111,13 @@ buildNumber.properties
 
 # Common working directory
 run/
-/docs/
+# docs/ is tracked — source of truth synced to Tubs-Pluginz/docs
 .secrets
+VPP workflows.md
+
+.cursor/
+
+# Live E2E runtime state & generated reports
+e2e/.state/
+e2e/reports/
+e2e/runner/node_modules/

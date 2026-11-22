@@ -1,0 +1,15 @@
+{
+  "id": "velocity-ptero-power",
+  "name": "VelocityPteroPower",
+  "version": "${project.version}",
+  "description": "Manage Pterodactyl/Pelican/Calagopus/Mc Server Soft servers via Velocity.",
+  "url": "https://github.com/Tubs-Pluginz/VelocityPteroPower",
+  "authors": ["TubYoub"],
+  "main": "de.tubyoub.velocitypteropower.VelocityPteroPower",
+  "dependencies": [
+    {
+      "id": "maintenance",
+      "optional": true
+    }
+  ]
+}

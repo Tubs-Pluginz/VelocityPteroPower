@@ -1,0 +1,12 @@
+[
+  { "text": "Introduction", "file": "index" },
+  { "text": "Installation", "file": "installation" },
+  { "text": "Configuration", "file": "configuration" },
+  { "text": "Lobbies & Limbo", "file": "lobbies-and-limbo" },
+  { "text": "Core Mechanics", "file": "core-mechanics" },
+  { "text": "Commands", "file": "commands" },
+  { "text": "Permissions", "file": "permissions" },
+  { "text": "Addons", "file": "addons" },
+  { "text": "FAQ", "file": "faq" },
+  { "text": "Troubleshooting", "file": "troubleshooting" }
+]

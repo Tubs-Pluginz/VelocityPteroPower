@@ -1,0 +1,61 @@
+# Pushes versioned docs/ folders to Tubs-Pluginz/docs on every docs change.
+#
+# Layout in this repo:
+#   docs/<version>/index.md   e.g. docs/0-9-6/installation.md
+# Optional per-version sidebar control:
+#   docs/<version>/sidebar.json
+#   or frontmatter: title / sidebar_label / order
+#
+# One-time: add org/repo secret DOCS_SYNC_TOKEN (PAT with Contents write +
+# Actions on Tubs-Pluginz/docs so it can trigger repository_dispatch).
+
+name: Sync Docs to Site
+
+on:
+  push:
+    # Default branch is `dev`; also cover common defaults.
+    branches: [dev, main, master]
+    paths: ['docs/**']
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for versioned docs
+        id: check
+        run: |
+          if compgen -G 'docs/*/index.md' > /dev/null; then
+            echo "has_docs=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_docs=false" >> "$GITHUB_OUTPUT"
+            echo "No docs/<version>/index.md found; skipping sync."
+          fi
+
+      - name: Trigger docs site sync
+        if: steps.check.outputs.has_docs == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_SYNC_TOKEN }}
+          BASE_PATH: VelocityPteroPower
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "Missing secret DOCS_SYNC_TOKEN"
+            exit 1
+          fi
+          jq -n \
+            --arg event_type "sync-plugin-docs" \
+            --arg repo "${{ github.repository }}" \
+            --arg ref "${{ github.sha }}" \
+            --arg base "$BASE_PATH" \
+            '{
+              event_type: $event_type,
+              client_payload: {
+                source_repo: $repo,
+                source_ref: $ref,
+                base_path: $base
+              }
+            }' | gh api repos/Tubs-Pluginz/docs/dispatches --input -
+          echo "Dispatched sync for $BASE_PATH @ ${{ github.sha }}"

@@ -1,0 +1,53 @@
+config-version = "2.7"
+bind = "0.0.0.0:25577"
+motd = "VelocityPteroPower Live E2E Proxy"
+show-max-players = 100
+online-mode = false
+force-key-authentication = false
+prevent-client-proxy-connections = false
+player-info-forwarding-mode = "modern"
+forwarding-secret-file = "forwarding.secret"
+announce-forge = false
+kick-existing-players = false
+ping-passthrough = "DISABLED"
+enable-player-address-logging = true
+
+[servers]
+limbo = "__BACKEND_HOST__:__PORT_LIMBO__"
+lobby-1 = "__BACKEND_HOST__:__PORT_LOBBY1__"
+lobby-2 = "__BACKEND_HOST__:__PORT_LOBBY2__"
+survival = "__BACKEND_HOST__:__PORT_SURVIVAL__"
+skywars = "__BACKEND_HOST__:__PORT_SKYWARS__"
+bedwars = "__BACKEND_HOST__:__PORT_BEDWARS__"
+try = [
+  "lobby-1",
+  "lobby-2",
+  "limbo"
+]
+
+[forced-hosts]
+"survival.vpp.test" = ["survival"]
+"skywars.vpp.test" = ["skywars"]
+"bedwars.vpp.test" = ["bedwars"]
+"limbo.vpp.test" = ["limbo"]
+
+[advanced]
+compression-threshold = 256
+compression-level = -1
+login-ratelimit = 0
+connection-timeout = 5000
+read-timeout = 30000
+haproxy-protocol = false
+tcp-fast-open = false
+bungee-plugin-message-channel = true
+show-ping-requests = false
+failover-on-unexpected-server-disconnect = true
+announce-proxy-commands = true
+log-command-executions = true
+log-player-connections = true
+
+[query]
+enabled = false
+port = 25577
+map = "Velocity"
+show-plugins = false

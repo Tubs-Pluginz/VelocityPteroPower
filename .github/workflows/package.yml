@@ -1,0 +1,178 @@
+name: Publish API package (alpha on API changes)
+
+on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - 'vpp-api/**'
+      - 'docs/api/**'
+      - 'pom.xml'
+      - 'vpp-api/pom.xml'
+      - '.github/workflows/package.yml'
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-alpha-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-alpha:
+    name: Deploy alpha package to Maven Central
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    environment: maven-central
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Compute alpha version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          POM_VERSION=$(mvn -q -Dexec.executable=echo \
+            -Dexec.args='${project.version}' \
+            --non-recursive org.codehaus.mojo:exec-maven-plugin:3.1.0:exec)
+
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          BASE_VERSION=$(echo "$POM_VERSION" | sed -E 's/-(alpha|beta|snapshot|SNAPSHOT|rc[0-9]+)$//')
+          NEW_VERSION="${BASE_VERSION}-alpha-${SHORT_SHA}"
+
+          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Alpha version: ${NEW_VERSION}"
+
+      - name: Set version and install API (+ parent locally)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -q versions:set \
+            -DnewVersion="${{ steps.meta.outputs.new_version }}" \
+            -DgenerateBackupPoms=false \
+            -DprocessAllModules=true
+          # Install parent + vpp-api into the local repo; do not deploy parent
+          mvn -B -DskipTests clean install -pl vpp-api -am
+
+      - name: Deploy to Maven Central (Alpha)
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          echo "Deploying alpha version ${{ steps.meta.outputs.new_version }} to Maven Central..."
+          # Deploy only vpp-api (flattened POM; no parent publish required)
+          mvn -B -DskipTests deploy -P release -pl vpp-api
+
+  deploy-release:
+    name: Deploy release package to Maven Central
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment: maven-central
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Compute release version from tag
+        id: rel
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          if [ -z "$TAG_NAME" ]; then
+            echo "No tag name found in release payload" >&2
+            exit 1
+          fi
+          VERSION=${TAG_NAME#v}
+          VERSION=${VERSION#V}
+          echo "Release version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set version and install API (+ parent locally)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -q versions:set \
+            -DnewVersion="${{ steps.rel.outputs.version }}" \
+            -DgenerateBackupPoms=false \
+            -DprocessAllModules=true
+          mvn -B -DskipTests clean install -pl vpp-api -am
+
+      - name: Deploy to Maven Central (Release)
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          echo "Deploying release version ${{ steps.rel.outputs.version }} to Maven Central..."
+          mvn -B -DskipTests deploy -P release -pl vpp-api
+
+  verify-build:
+    name: Verify API build works
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Test API package (no GPG / no deploy)
+        run: |
+          set -euo pipefail
+          echo "Installing parent + packaging vpp-api..."
+          mvn -B -DskipTests clean install -pl vpp-api -am
+
+          echo "Packaging with release flatten (skip GPG via package phase only)..."
+          mvn -B -DskipTests package -P release -pl vpp-api
+
+          echo "Verifying API artifacts were created..."
+          ls -la vpp-api/target/*.jar
+
+          echo "Verifying flattened POM exists..."
+          test -f vpp-api/.flattened-pom.xml || test -f vpp-api/target/*.pom
+          ls -la vpp-api/.flattened-pom.xml 2>/dev/null || true
+
+          echo "Checking for SNAPSHOT dependencies in effective POM..."
+          mvn -pl vpp-api help:effective-pom | grep -i snapshot || echo "No SNAPSHOT dependencies found (good!)"

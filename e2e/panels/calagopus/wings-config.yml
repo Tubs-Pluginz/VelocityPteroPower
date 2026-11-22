@@ -1,0 +1,25 @@
+app_name: Calagopus
+debug: true
+api:
+  host: 0.0.0.0
+  port: 8080
+  ssl:
+    enabled: false
+system:
+  root_directory: /tmp/vpp-e2e-calagopus-wings
+  data: /tmp/vpp-e2e-calagopus-wings/volumes
+  archive_directory: /tmp/vpp-e2e-calagopus-wings/archives
+  backup_directory: /tmp/vpp-e2e-calagopus-wings/backups
+  tmp_directory: /tmp/vpp-e2e-calagopus-wings/tmp
+docker:
+  network:
+    interface: 172.30.0.1
+    name: vpp_cala_nw
+    network_mode: vpp_cala_nw
+    driver: bridge
+    is_internal: false
+    enable_icc: true
+    interfaces:
+      v4:
+        subnet: 172.30.0.0/16
+        gateway: 172.30.0.1
