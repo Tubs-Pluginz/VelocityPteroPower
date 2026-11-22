@@ -1,46 +1,64 @@
 ---
 title: VPP permission
 ---
-# Permissions Reference 🔑
+# Permissions reference
 
-Assign these with a Velocity permissions plugin (LuckPerms works fine).
+Assign these with a Velocity permissions plugin such as LuckPerms.
 
 ## Command permissions
 
-*   `ptero.start` — `/ptero start <server>`
-*   `ptero.stop` — `/ptero stop <server>`
-*   `ptero.restart` — `/ptero restart <server>`
-*   `ptero.list` — `/ptero list`
-*   `ptero.info` — `/ptero info <server>` and `/ptero apithreads`
-*   `ptero.stopIdle` — `/ptero stopidle`
-*   `ptero.forcestopall` — `/ptero forcestopall [confirm]`
-        ::: danger High Privilege
-        Stops every managed server. Keep this on trusted admins only.
-        :::
-*   `ptero.forcestartall` — `/ptero forcestartall [confirm]`
-*   `ptero.whitelistReload` — `/ptero whitelistReload`
-        ::: warning Panel Limitation
-        Only useful when the panel can fetch files (Pterodactyl / Pelican / Calagopus). No effect on MC Server Soft.
-        :::
-*   `ptero.reload` — `/ptero reload` (also opens the addon command tree)
-*   `ptero.history` — in-memory `/ptero history`
-*   `ptero.maintenance` — built-in `/ptero maintenance` (or use `ptero.reload`)
+| Permission | Grants |
+| --- | --- |
+| `ptero.start` | `/ptero start <server>` |
+| `ptero.stop` | `/ptero stop <server>` |
+| `ptero.restart` | `/ptero restart <server>` |
+| `ptero.list` | `/ptero list`. Also shows every queue in `/ptero queue`. |
+| `ptero.info` | `/ptero info <server>`, `/ptero apithreads` and `/ptero api` |
+| `ptero.history` | `/ptero history`, the in-memory move history |
+| `ptero.stopIdle` | `/ptero stopidle` |
+| `ptero.forcestopall` | `/ptero forcestopall [confirm]` |
+| `ptero.forcestartall` | `/ptero forcestartall [confirm]` |
+| `ptero.whitelistReload` | `/ptero whitelistReload` |
+| `ptero.maintenance` | `/ptero maintenance` (built-in maintenance mode) |
+| `ptero.password` | `/ptero password` (manage start passwords) |
+| `ptero.reload` | `/ptero reload`. Also grants `/ptero maintenance`, `/ptero password`, every `/ptero addon` subcommand, and the staff view of `/ptero queue`. |
 
-## Special permissions
+`/ptero queue` and `/ptero unlock` need no permission.
 
-*   `ptero.bypass` — if `whitelistAllowBypass: true`, skips VPP's own whitelist gate for servers with `whitelist: true`.
-::: danger Backend Whitelist Still Applies
-`ptero.bypass` only skips VPP's check. The Minecraft backend still enforces its own whitelist. Staff can trigger a start and still get denied by the game server.
+::: danger High privilege
+`ptero.forcestopall` stops every managed server. Give it to trusted admins only.
 :::
 
-*   `ptero.maxcap.bypass` — ignore `maxOnlineServers` when starting.
+::: warning Panel limitation
+`ptero.whitelistReload` only does something on panels VPP can read files from (Pterodactyl, Pelican, Calagopus). It has no effect on MC Server Soft.
+:::
+
+## Bypass permissions
+
+| Permission | Effect |
+| --- | --- |
+| `ptero.bypass` | Skips VPP's whitelist check for servers with `whitelist: true`. Only works while `whitelistAllowBypass: true`. |
+| `ptero.maxcap.bypass` | Ignores the `maxOnlineServers` cap when starting a server. Only works while `maxOnlineAllowBypass: true`. |
+| `ptero.password.bypass` | Starts a server that has a `startPassword` without running `/ptero unlock`. |
+
+::: danger The backend whitelist still applies
+`ptero.bypass` only skips VPP's check. The Minecraft server still enforces its own whitelist, so a player with this permission can start a server and then get kicked by it.
+:::
+
+If you run kennytv's Maintenance plugin, VPP also respects that plugin's own bypass nodes when it decides whether a start is blocked: `maintenance.admin`, `maintenance.bypass`, and `maintenance.singleserver.bypass.<server>`.
 
 ## Addon permissions
 
-*   `ptero.addon` — list / browse / info
-*   `ptero.addon.install` — install / update from catalog
-*   `ptero.addon.manage` — uninstall / enable / disable / reload
+| Permission | Grants |
+| --- | --- |
+| `ptero.addon` | `/ptero addon list`, `browse` and `info` |
+| `ptero.addon.install` | `/ptero addon install` and `update` |
+| `ptero.addon.manage` | `/ptero addon uninstall`, `enable`, `disable` and `reload` |
 
-::: tip Best Practices
-Give high-privilege nodes (`forcestopall`, `forcestartall`, addon manage) only to people who already break things on purpose.
+`ptero.reload` grants all three.
+
+Addons can register their own commands with their own permission nodes. The move-history addon, for example, uses `vpp.audit.use` for `/ptero audit` and `vpp.audit.manage` (or `ptero.history`) for `clear` and `export`. See [Addons](addons.md).
+
+::: tip
+Give `forcestopall`, `forcestartall` and `ptero.addon.manage` only to people you trust to take servers down.
 :::

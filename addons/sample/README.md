@@ -1,6 +1,6 @@
-# VPP Sample Addon
+# VPP sample addon
 
-Example **VPP-managed** addon (not a Velocity plugin).
+Example VPP addon. VPP loads it from its own addons folder. It is not a Velocity plugin.
 
 ## Build
 
@@ -14,19 +14,23 @@ Output: `addons/sample/target/vpp-addon-sample-*.jar`
 
 ## Install
 
-1. Copy the JAR into `plugins/velocity-ptero-power/addons/`
-2. Restart Velocity, or run `/ptero addon reload all` if VPP is already running and the JAR was replaced
-3. Or use `/ptero addon install vpp-sample` once an addon release asset is published (see catalog download URLs)
+The sample addon is not in the addon catalog or on the nightly release, so build it yourself.
+
+1. Copy the JAR into `plugins/velocity-ptero-power/addons/`.
+2. Restart Velocity. VPP only scans the addons folder at startup. If VPP already loaded the addon and you replaced the JAR with one of the same file name, `/ptero addon reload vpp-sample` is enough.
 
 ## Config
 
-YAML is stored at `plugins/velocity-ptero-power/addons/configs/vpp-sample.yml` (legacy `addons/vpp-sample.yml` is migrated automatically).
+The config file is `plugins/velocity-ptero-power/addons/configs/vpp-sample.yml`. VPP moves an old `addons/vpp-sample.yml` there on first load.
 
-## Commands (examples)
+## Commands
+
+Each command needs `vpp.sample.<command>`, for example `vpp.sample.greet`. `/ptero sampleinfo` uses `vpp.sample.info`.
 
 - `/ptero greet [name]`
 - `/ptero sampleinfo`
 - `/ptero cfg`
 - `/ptero event`
+- `/ptero http`
 - `/ptero servers`
 - `/ptero route`

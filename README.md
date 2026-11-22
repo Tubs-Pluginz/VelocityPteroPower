@@ -18,7 +18,7 @@ VelocityPteroPower (VPP) connects your Velocity proxy to Pterodactyl, Pelican Pa
 
 You need **Velocity 4.3+ and Java 25** on the proxy. Velocity 3.x is not supported since 0.9.6.
 
-Configuration, commands and permissions are documented in detail on the [Docs Page](https://docs.pluginz.dev/).
+The [docs page](https://docs.pluginz.dev/) covers configuration, commands and permissions in detail.
 
 ## Features
 
@@ -65,7 +65,7 @@ Configuration, commands and permissions are documented in detail on the [Docs Pa
 1. Download the latest `.jar` from [Modrinth](https://modrinth.com/plugin/velocitypteropower).
 2. Put it in your Velocity `plugins` folder.
 3. Restart Velocity.
-4. Edit `plugins/velocity-ptero-power/config.yml`. The [Docs Page](https://docs.pluginz.dev/) explains every option.
+4. Edit `plugins/velocity-ptero-power/config.yml`. The [docs page](https://docs.pluginz.dev/) explains every option.
 
 ## Commands
 - `/ptero start <server>`
@@ -140,7 +140,7 @@ Build:
 ```bash
 mvn -pl vpp-plugin -am package          # main plugin
 mvn -pl addons/sample -am package       # one addon
-mvn package                             # plugin and all addons
+mvn package                             # plugin, all addons and the test bridge
 ```
 
 Addons are JARs that VPP loads itself. They are not separate Velocity plugins. Implement `de.tubyoub.vpp.api.VPPAddon`, register it in `META-INF/services/de.tubyoub.vpp.api.VPPAddon`, depend on `vpp-api` with `provided` scope, and drop the JAR into `plugins/velocity-ptero-power/addons/`.
@@ -151,16 +151,16 @@ Each addon's config is `plugins/velocity-ptero-power/addons/configs/<addonId>.ym
 <dependency>
   <groupId>de.tubyoub</groupId>
   <artifactId>vpp-api</artifactId>
-  <version>0.9.6-alpha</version>
+  <version>0.9.6-beta</version>
   <scope>provided</scope>
 </dependency>
 ```
 
 The official catalog is [`catalog/addons.json`](catalog/addons.json), served from the `dev` branch. You can add your own with `addons.extraCatalogUrls` or `addons.extraEntries` in `config.yml`.
 
-- `/ptero addon install ...` downloads from the rolling GitHub `nightly` prerelease. CI refreshes those JARs on every nightly build.
+- `/ptero addon install ...` downloads from the rolling GitHub `nightly` prerelease. CI rebuilds that prerelease on every push.
 - Webhooks, scheduler and move-history each have their own Modrinth project for browser downloads. The sample addon is only built locally.
-- A JAR you drop into the addons folder shows up as installed in `/ptero addon browse` once it loads.
+- VPP scans the addons folder at startup. A JAR you drop in shows up as installed in `/ptero addon browse` after the next restart.
 
 ## Testing
 `mvn test` runs the unit and panel contract tests in a few seconds, no Docker needed.

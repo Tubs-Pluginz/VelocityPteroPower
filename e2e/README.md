@@ -1,78 +1,80 @@
-# VelocityPteroPower Automated Testing Suite
+# VelocityPteroPower automated tests
 
-This testing suite covers VelocityPteroPower end-to-end across **Pterodactyl**, **Pelican**, and **Calagopus** (McServerSoft is intentionally excluded), using **live `:latest` Panels**, **live `:latest` Wings daemons**, **real dynamically created Minecraft servers**, **real Velocity 4.3+ (Java 25)**, and **automated headless Minecraft clients**—with an automatic versioned report generated on every run.
+The tests cover VelocityPteroPower end to end on Pterodactyl, Pelican and Calagopus. Mc Server Soft is not covered. The live suite runs against `:latest` panel and Wings images, PicoLimbo servers that the panel creates, Velocity 4.3+ on Java 25 and headless Minecraft clients. Every run writes a versioned report.
 
-## 1. Fast Unit & 3-Panel Contract Tests (Maven, ~5s)
+## 1. Unit and panel contract tests (Maven, about 5s)
 
-Runs without Docker against Pterodactyl, Pelican, and Calagopus wire protocols plus all core services and addons:
+These run without Docker. They cover the Pterodactyl, Pelican and Calagopus wire protocols, the core services and the addons:
 
 ```bash
 mvn test
 ```
 
-## 2. Live Panel + Live Wings + Automated MC Client E2E Suite
+## 2. Live panel E2E suite
 
 ### Prerequisites
-- Running Docker Engine (or rootless Podman with `systemctl --user start podman.socket`)
-- `jq`, `curl`, `bash` (Node.js optional — the runner builds in Docker automatically)
-- JDK 25 + Maven (or pass `--skip-build` if JARs are already packaged)
+- A running Docker Engine, or rootless Podman with `systemctl --user start podman.socket`
+- `jq`, `curl` and `bash`. Node.js is optional: the test runner runs in a Docker image, and a local `node` is only used to generate the report.
+- JDK 25 and Maven, or pass `--skip-build` if the JARs are already built
 
-### Run Locally
+### Run locally
 
 ```bash
-# Single live panel (pulls :latest Panel + :latest Wings + latest Velocity 4.x + latest PicoLimbo)
+# One panel (pulls :latest Panel + :latest Wings + latest Velocity 4.x + latest PicoLimbo)
 ./e2e/run-live-e2e.sh pterodactyl
 ./e2e/run-live-e2e.sh pelican
 ./e2e/run-live-e2e.sh calagopus
 
-# Run all 3 live panels back-to-back
+# All three panels, one after another
 ./e2e/run-live-e2e.sh all
 
 # Debugging options
 ./e2e/run-live-e2e.sh pterodactyl --skip-build --keep-up
 ```
 
-### What Each Live Run Does Automatically
-1. **Builds** the shaded VPP plugin (`velocitypteropower-*-shaded.jar`), all 4 official addons, and the test-only `vpp-test-bridge` plugin.
-2. **Pulls `:latest`** Panel and Wings images (`ghcr.io/pterodactyl/{panel,wings}:latest`, `ghcr.io/pelican/{panel,wings}:latest`, or `calagopus/panel:aio`).
-3. **Zero-touch provisions** the live Panel: runs DB migrations, creates an admin account, mints real API keys (`ptlc_` / `pacc_` / `c7sp_`), imports the lightweight `PicoLimbo` Velocity Modern Forwarding egg (`e2e/eggs/egg-picolimbo-vpp-e2e.json`), configures the live Wings node, and **creates 6 real servers** (`limbo`, `lobby-1`, `lobby-2`, `survival`, `skywars`, `bedwars`) with a real `whitelist.json`.
-4. **Boots real Velocity 4.3+ (Java 25)** with VPP + all official addons + `vpp-test-bridge` + local `webhook-sink`.
-5. **Connects automated headless Minecraft clients** (`Alice`, `Bob`, `Admin`, `Stranger`) over real Minecraft TCP protocol (`minecraft-protocol`) to test:
-   - Panel auth, `PanelType` detection, and live Wings WebSocket state cache
-   - `alwaysOnline` limbo & lobby auto-start on live Wings
-   - Forced-host cold start → limbo holding → `HYBRID` readiness + `startupJoinDelay` settle → auto-transfer
-   - Idle shutdown scheduling, cancel-on-rejoin race, and live Wings container stop
-   - Concurrent multi-player start queue deduplication
-   - Real `whitelist.json` fetch from live Panel/Wings, `/ptero whitelistReload`, and `ptero.bypass`
-   - Server groups linked starts (`skywars` + `bedwars`) and single-use `/ptero unlock` start passwords
-   - `maxOnlineServers` cap queueing & auto-start when a slot frees
-   - Built-in `/ptero maintenance` and external `MaintenanceProvider` SPI cold-start blocking
-   - Persistent queue reconnect resume
-   - Core `/ptero` commands and official addons (`vpp-webhooks`, `vpp-scheduler`, `vpp-move-history`)
-   - Admin power commands (`start`, `restart`, `stop`, `stopidle`) on live Wings, including a grouped peer start
-   - Staff commands (`password`, `queue`, `api`, `apithreads`, `reload`, `history`) plus permission denial and the unconfirmed `forcestopall` / `forcestartall` prompt
+Without an argument the script runs `pterodactyl`. `--keep-up` leaves the containers running after the suite finishes.
+
+### What a live run does
+1. Builds the Maven reactor and stages the shaded plugin (`velocitypteropower-*-shaded.jar`), the three official addons (webhooks, scheduler, move-history) and the test-only `vpp-test-bridge` plugin. The sample addon is skipped.
+2. Pulls the panel and Wings images: `ghcr.io/pterodactyl/{panel,wings}:latest`, `ghcr.io/pelican/{panel,wings}:latest`, or `calagopus/panel:aio`, which runs Wings inside the panel container.
+3. Sets up the panel with no manual steps. It runs DB migrations, creates an admin account, mints client API keys (`ptlc_`, `pacc_` or `c7sp_`), imports the PicoLimbo egg with Velocity modern forwarding (`e2e/eggs/egg-picolimbo-vpp-e2e.json`), configures the Wings node, and creates 6 servers (`limbo`, `lobby-1`, `lobby-2`, `survival`, `skywars`, `bedwars`) that each ship a `whitelist.json`.
+4. Starts Velocity 4.3+ (Java 25) with VPP, the official addons, `vpp-test-bridge` and a local `webhook-sink`.
+5. Connects headless Minecraft clients (`Alice`, `Bob`, `Carol`, `Dave`, `Admin`, `Stranger`) over the Minecraft protocol (`minecraft-protocol`) and runs 30 scenarios:
+   - Panel auth, `PanelType` detection and the Wings WebSocket state cache
+   - `alwaysOnline` limbo and lobby auto-start
+   - Forced-host cold start, then limbo holding, then `HYBRID` readiness and the `startupJoinDelay` settle, then the transfer
+   - Idle shutdown scheduling, cancel on rejoin, and the Wings container stopping
+   - Several players starting the same server share one queue
+   - Fetching the real `whitelist.json` from the panel, `/ptero whitelistReload` and `ptero.bypass`
+   - Group starts (`skywars` + `bedwars`) and single-use `/ptero unlock` start passwords
+   - `maxOnlineServers` queueing and auto-start when a slot frees up
+   - Built-in `/ptero maintenance` and an external `MaintenanceProvider` blocking cold starts
+   - Persistent queue resuming after a reconnect
+   - Core `/ptero` commands and the official addons (`vpp-webhooks`, `vpp-scheduler`, `vpp-move-history`)
+   - Admin power commands (`start`, `restart`, `stop`, `stopidle`), including a grouped peer start
+   - Staff commands (`password`, `queue`, `api`, `apithreads`, `reload`, `history`), permission denial, and the unconfirmed `forcestopall` / `forcestartall` prompt
    - Global maintenance blocking a cold start
    - `ptero.maxcap.bypass` starting a server while `maxOnlineServers` is full
    - `playerStartCooldown` blocking a second cold start
-   - Four simultaneous players across lobby scale-up plus two game backends
-   - Group idle-shutdown guard (occupied `skywars` keeps empty `bedwars` online)
-   - `RoutingProvider` rewriting a forced-host connect onto limbo
-   - Idle extra lobby scaling back down (`scaleDownIdleSeconds`) while `minOnline` keeps lobby-1
-   - Config variants flipped at runtime via the bridge `/file` endpoint + `/ptero reload`: `queueWhenMaxOnline=false`, `maxOnlineReservations`, `forcedHostOfflineBehavior` `DISCONNECT` / `LIMBO_ONLY`, `serverStatusCheckMethod` `PANEL_API` / `VELOCITY_PING`, `languageOverride: de_DE`
-   - Tab-complete (bridge `/suggest`), `password generate` + player unlock, `/ptero queue` and `/ptero history` content
-   - Webhooks `format: auto` sending Discord embeds to a Discord-shaped URL and generic JSON elsewhere, plus `/ptero webhook test`
-   - Addon manager `browse`, `disable`/`enable`, `uninstall` + `install` from the catalog (webhook-sink serves the freshly built JARs), move-history surviving an addon reload
-   - Scheduler firing a real `* * * * *` cron against Wings
-   - `resourcePrefetchEnabled` warming the resource cache for every server
-   - Confirmed `forcestartall` / `forcestopall`, then always-online + `minOnline` recovery
-   - Graceful proxy shutdown (`shutdownOnProxyExit`) stopping servers on live Wings
-6. **Generates a Versioned Test Log & Report automatically on every run (pass, fail, or early setup error)** under `e2e/reports/<timestamp>-<panel>/` (with latest shortcuts `e2e/reports/latest-<panel>.{log,md,html}`):
-   - `test-run.log` — single self-contained log file with **all resolved `:latest` versions, OCI digests, and pass/fail summary right at the top**, followed by full `provision`, `runner`, `velocity`, `panel`, `wings`, and `webhook-sink` logs
-   - `report.md` (published automatically to GitHub Actions Step Summary)
-   - `report.json` (structured results + exact component versions & OCI image digests)
-   - `report.html` (standalone visual report with collapsible logs)
-   - `logs/` (individual `provision.log`, `runner.log`, `velocity.log`, `panel.log`, `wings.log`, `webhook-sink.log` files)
+   - Four players across lobby scale-up and two game servers
+   - Group idle shutdown guard (a player on `skywars` keeps the empty `bedwars` online)
+   - `RoutingProvider` sending a forced-host connect to limbo
+   - An idle extra lobby stopping after `scaleDownIdleSeconds` while `minOnline` keeps `lobby-1` up
+   - Config variants changed at runtime through the bridge `/file` endpoint and `/ptero reload`: `queueWhenMaxOnline=false`, `maxOnlineReservations`, `forcedHostOfflineBehavior` `DISCONNECT` and `LIMBO_ONLY`, `serverStatusCheckMethod` `PANEL_API` and `VELOCITY_PING`, `languageOverride: de_DE`
+   - Tab completion (bridge `/suggest`), `password generate` with a player unlock, and the output of `/ptero queue` and `/ptero history`
+   - Webhooks `format: auto` sending Discord embeds to a Discord-style URL and generic JSON elsewhere, plus `/ptero webhook test`
+   - Addon manager `browse`, `disable`/`enable`, `uninstall` and `install` from the catalog (`webhook-sink` serves the freshly built JARs), and move-history keeping its data across an addon reload
+   - The scheduler firing a `* * * * *` cron that starts a server
+   - `resourcePrefetchEnabled` filling the resource cache for every server
+   - Confirmed `forcestartall` / `forcestopall`, then `alwaysOnline` and `minOnline` recovery
+   - Proxy shutdown (`shutdownOnProxyExit`) stopping servers through Wings
+6. Writes a log and report on every run, whether it passes, fails or breaks during setup. They go to `e2e/reports/<timestamp>-<panel>/`, with symlinks to the newest run at `e2e/reports/latest-<panel>.{log,md,html}`:
+   - `test-run.log`: one log file. It starts with the resolved `:latest` versions, OCI digests and the pass/fail summary, followed by the `provision`, `runner`, `velocity`, `panel`, `wings` and `webhook-sink` logs.
+   - `report.md`, which is also appended to the GitHub Actions step summary
+   - `report.json`, with the results and the exact component versions and image digests
+   - `report.html`, a standalone page with collapsible logs
+   - `logs/`, the separate `provision.log`, `runner.log`, `velocity.log`, `panel.log`, `wings.log` and `webhook-sink.log` files. Calagopus has no `wings.log` because Wings runs in the panel container.
 
-## 3. GitHub Actions Workflows
-- `.github/workflows/test.yml` — Runs fast Maven unit & 3-panel contract tests on every push and PR.
-- `.github/workflows/e2e-live-panels.yml` — Runs nightly (and via manual `workflow_dispatch`) against live `:latest` Pterodactyl, Pelican, and Calagopus + live Wings, publishing the exact resolved versions and test results into the workflow summary and uploading report artifacts.
+## 3. GitHub Actions workflows
+- `.github/workflows/test.yml` runs the unit and contract tests on pushes and pull requests to `main`, `dev` and `0.9.6-rework`.
+- `.github/workflows/e2e-live-panels.yml` runs the live suite every night at 03:00 UTC, and on demand through `workflow_dispatch`, against Pterodactyl, Pelican and Calagopus. It writes the resolved versions and results to the workflow summary and uploads the reports as artifacts for 30 days.

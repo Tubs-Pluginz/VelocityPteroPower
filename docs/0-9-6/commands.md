@@ -1,174 +1,218 @@
 ---
 title: VPP commands
 ---
-# Commands Reference 💻
+# Commands reference
 
-Base command: `/ptero` (alias `/vpp`). Works from console or in-game with the right permission.
+The base command is `/ptero`, with the alias `/vpp`. Every subcommand below works with either. You can run them from the console or in game if you have the permission.
+
+Running `/ptero` with no arguments prints the command list, including commands registered by loaded addons.
 
 ::: tip Case sensitivity
-Server names must match `velocity.toml` and `config.yml` exactly (usually case-sensitive).
+Server names must match the names in `velocity.toml` and `config.yml` exactly. They are usually case-sensitive.
 :::
 
-## Core Commands
+## Server control
 
 ### `/ptero start <serverName>`
-*   **Alias:** `/vpp start <serverName>`
-*   **Description:** Attempts to send a "start" signal to the specified server via the panel API.
-*   **Arguments:**
-    *   `<serverName>`: (Required) The name of the server to start.
-*   **Permission:** `ptero.start`
-*   **Usage Example:**
-    ```bash
-    /ptero start skyblock
-    ```
-*   **Notes:**
-    *   Respects player start cooldowns (see `playerStartCooldown` in config).
-    *   Checks if the server is already online or in the process of starting.
+Sends a start signal for the server to the panel.
+
+Permission: `ptero.start`
+
+```bash
+/ptero start skyblock
+```
+
+- The command refuses if maintenance blocks the server.
+- It respects `maxOnlineServers`, minus `maxOnlineReservations`. Players with `ptero.maxcap.bypass` skip the cap when `maxOnlineAllowBypass: true`.
+- It also starts the server's offline group members and `linkedServers`.
+- `playerStartCooldown` does not apply to this command. It only applies to starts triggered by a player connecting.
+- The command does not check whether the server is already running. It sends the signal either way.
 
 ### `/ptero stop <serverName>`
-*   **Alias:** `/vpp stop <serverName>`
-*   **Description:** Attempts to send a "stop" signal (graceful shutdown) to the specified server via the panel API.
-*   **Arguments:**
-    *   `<serverName>`: (Required) The name of the server to stop.
-*   **Permission:** `ptero.stop`
-*   **Usage Example:**
-    ```bash
-    /ptero stop creative
-    ```
+Sends a stop signal to the panel, which shuts the server down gracefully.
+
+Permission: `ptero.stop`
+
+```bash
+/ptero stop creative
+```
 
 ### `/ptero restart <serverName>`
-*   **Alias:** `/vpp restart <serverName>`
-*   **Description:** Attempts to send a "restart" signal to the specified server via the panel API.
-*   **Arguments:**
-    *   `<serverName>`: (Required) The name of the server to restart.
-*   **Permission:** `ptero.restart`
-*   **Usage Example:**
-    ```bash
-    /ptero restart survival
-    ```
+Sends a restart signal to the panel.
+
+Permission: `ptero.restart`
+
+```bash
+/ptero restart survival
+```
+
+## Status and information
 
 ### `/ptero list`
-*   **Alias:** `/vpp list`
-*   **Description:** Displays a pretty, MiniMessage-formatted list of all managed servers, including their status, current player count, and TTL (time-to-shutdown).
-*   **Permission:** `ptero.list`
-*   **Notes:**
-    *   Status is determined by your configured `serverStatusCheckMethod`.
-    *   TTL shows:
-        - A live countdown if a shutdown is already scheduled.
-        - The configured per-server `timeout` (as a preview) when the server is currently empty but no countdown has started yet.
-        - `—` for servers marked in `alwaysOnline`.
+Lists every managed server with its status, player count and TTL (time until shutdown).
+
+Permission: `ptero.list`
+
+- Status comes from your `serverStatusCheckMethod`.
+- The TTL column shows one of these:
+  - a live countdown if a shutdown is already scheduled
+  - the server's configured `timeout`, when the server is empty but no countdown has started yet
+  - a dash for servers in `alwaysOnline`, and for servers with players or with `timeout: -1`
 
 ### `/ptero info <serverName>`
-*   **Alias:** `/vpp info <serverName>`
-*   **Description:** Shows a detailed, MiniMessage-formatted panel for the specified server, including status, players, CPU, memory, disk, network I/O, and uptime.
-*   **Arguments:**
-    *   `<serverName>`: (Required) The name of the server.
-*   **Permission:** `ptero.info`
-*   **Notes:**
-    *   Live resource usage is fetched from your panel and is cached for `resourceCacheSeconds` to avoid spamming the API.
-    *   CPU and disk limits are shown only when configured on the panel; unlimited limits are omitted (disk) or displayed as “unlimited” (memory).
-    *   Usage values are colorized with a smooth green→red gradient relative to their limits (or to 100% for CPU when unlimited) for quick visual insight.
-    *   When a server was initiated by a player via VPP, the panel includes an extra line: `Started by: <player>`.
+Shows status, players, CPU, memory, disk, network traffic and uptime for one server.
+
+Permission: `ptero.info`
+
+- VPP fetches resource usage from the panel and caches it for `resourceCacheSeconds`.
+- The CPU and disk limits only appear when the panel sets them. An unlimited disk shows no limit, and unlimited memory shows "unlimited".
+- Usage values are colored from green to red based on how close they are to the limit. CPU without a limit is measured against 100%.
+- If a player started the server through VPP, an extra line shows `Started by: <player>`.
 
 ### `/ptero history [playerName|uuid]`
-*   **Alias:** `/vpp history [playerName|uuid]`
-*   **Description:** Displays a pretty, in-memory move history for a player (latest first). Shows server-to-server transitions and disconnects.
-*   **Arguments:**
-    *   `playerName|uuid`: Optional. If omitted and you are a player, shows your history. You can also query by UUID.
-*   **Permission:** `ptero.history`
-*   **Notes:**
-    *   Requires `moveHistory.enabled: true` in `config.yml`.
-    *   History is not persisted to disk; it resets on proxy restart.
-    *   Tab-completion suggests online player names.
+Shows a player's recent server moves and disconnects, newest first.
 
-## Bulk & Utility Commands
+Permission: `ptero.history`
 
-### `/ptero stopidle`
-*   **Alias:** `/vpp stopidle`
-*   **Description:** Attempts to stop all currently managed servers that are detected as empty (no players connected) AND are *not* listed in the `stopIdleIgnore` section of `config.yml`.
-*   **Permission:** `ptero.stopIdle`
-*   **Notes:**
-    *   Player count is checked at the moment of command execution.
-    *   This command respects API rate limits. If limits are hit, not all eligible servers may receive the stop signal in one go.
-
-### `/ptero forcestopall [confirm]`
-*   **Alias:** `/vpp forcestopall [confirm]`
-*   **Description:**
-    ::: danger Extreme Caution Advised!
-    This command attempts to send a "stop" signal to **ALL** servers managed by VPP, irrespective of player counts or the `stopIdleIgnore` list. Use with extreme care as it can be highly disruptive.
-    :::
-*   **Permission:** `ptero.forcestopall`
-*   **Confirmation Protocol:**
-    *   **Players:**
-        1.  Execute `/ptero forcestopall`. You will receive a warning and instructions.
-        2.  Execute `/ptero forcestopall confirm` within 30 seconds to proceed.
-    *   **Console:** Confirmation is bypassed when run from the console.
-*   **Notes:** Also respects API rate limits.
-
-### `/ptero forcestartall [confirm]`
-*   **Alias:** `/vpp forcestartall [confirm]`
-*   **Description:**
-    ::: danger Resource Heavy Operation!
-    This command attempts to send a "start" signal to **ALL** servers managed by VPP. Ensure your host has sufficient resources (CPU, RAM, disk I/O) before proceeding.
-    :::
-*   **Permission:** `ptero.forcestartall`
-*   **Confirmation Protocol:**
-    *   **Players:**
-        1.  Execute `/ptero forcestartall`. You will receive a warning and instructions.
-        2.  Execute `/ptero forcestartall confirm` within 30 seconds to proceed.
-    *   **Console:** Confirmation is bypassed when run from the console.
-*   **Notes:** Respects API rate limits; not all servers may receive the start signal immediately if the panel is rate-limiting.
-
-### `/ptero whitelistReload`
-*   **Alias:** `/vpp whitelistReload`
-*   **Description:** Forces an immediate re-fetch and update of the `whitelist.json` file for all servers configured with `whitelist: true`.
-*   **Permission:** `ptero.whitelistReload`
-    ::: warning MC Server Soft Incompatibility
-    This command (and the whitelist feature it manages) is **not supported** if your panel is MC Server Soft, as VPP cannot fetch files from it.
-    :::
-
-### `/ptero reload`
-*   **Alias:** `/vpp reload`
-*   **Description:** Reloads `config.yml` and files under `messages/`. Most settings apply without a full proxy restart.
-*   **Permission:** `ptero.reload`
-*   **Notes:**
-    *   Some settings, like `apiThreads`, will still need a full proxy restart to take effect.
-    *   The panel API client will be re-initialized if `pterodactyl.url`, `pterodactyl.apiKey`, or the detected panel type changes upon reload.
-
-### `/ptero apithreads`
-*   **Alias:** `/vpp apithreads`
-*   **Description:** Displays API executor thread details: configured `apiThreads`, detected server count, auto baseline (2x servers, clamped 4..64), and the final threads currently in use. Helps verify whether your configured value overrides the baseline.
-*   **Permission:** `ptero.info`
-*   **Notes:**
-    *   Thread pool size is computed on startup or reload. Changing `apiThreads` requires a reload/restart to apply.
-    *   Setting `apiThreads` higher than the baseline will override the auto-calculated value.
+- Without an argument, a player sees their own history. The console has to name a player.
+- Names only resolve for online players. For offline players, use the UUID.
+- Needs `moveHistory.enabled: true` in `config.yml`.
+- History lives in memory and is cleared when the proxy restarts. For a history that survives restarts, install the move-history addon and use `/ptero audit`.
+- Tab completion suggests online player names.
 
 ### `/ptero queue`
-*   **Description:** Shows your start-wait queue position / remaining timeout (if waiting).
-*   **Permission:** none special beyond being able to run `/ptero` as a player (staff can query others where supported).
+Shows where you are in the start-wait queue and how many seconds are left before the start times out.
 
-### `/ptero unlock <serverName> [password]`
-*   **Description:** Consumes a single-use start password for a server that has `startPassword` set.
-*   **Permission:** player connection path; bypass via staff perms where configured.
+Permission: none. Players with `ptero.list` or `ptero.reload`, and the console, see every server's queue instead: the server name, the number of waiting players and the time left.
 
-### `/ptero maintenance …`
-*   **Description:** Built-in maintenance gate for cold starts (`on` / `off` for a server or global). External providers (e.g. kennytv) can also register.
-*   **Permission:** `ptero.maintenance` or `ptero.reload`
+### `/ptero apithreads`
+Shows the configured `apiThreads`, the number of managed servers, the automatic baseline (2 times the server count, clamped to 4..64) and the thread count in use. Use it to check whether your `apiThreads` value overrides the baseline.
 
-### `/ptero audit …`
-*   **Description:** Persistent move/connect audit from the **move-history addon** (not the in-memory `/ptero history`).
-*   **Permission:** as defined by that addon / `ptero.history`-style staff access once installed.
+Permission: `ptero.info`
 
-### `/ptero addon …`
-*   **Description:** Manage VPP-managed addons (list, browse, install, update, enable/disable, reload).
-*   **Permission:** `ptero.addon` (install needs `ptero.addon.install`; manage needs `ptero.addon.manage`). `ptero.reload` also grants access.
-*   **Details:** [Addons](addons.md)
+- VPP sizes the thread pool when it creates the API client, on startup. A reload only rebuilds the client when the panel type or API key changes, so plan a restart after changing `apiThreads`.
+- The pool uses the larger of `apiThreads` and the baseline.
 
-### `/ptero help`
-*   **Alias:** `/vpp help`
-*   **Description:** Short command list.
-*   **Permission:** none
+### `/ptero api`
+Shows the public addon API version, whether a routing provider is registered, the addon commands that are registered, and whether the panel HTTP, server control and server registry services are available. This is mostly useful when you develop or debug an addon.
 
-::: info
-Server names in commands must match `velocity.toml` and `config.yml` (usually case-sensitive).
+Permission: `ptero.info`
+
+## Bulk commands
+
+### `/ptero stopidle`
+Sends a stop signal to every managed server that has no players connected, except the servers listed in `stopIdleIgnore`.
+
+Permission: `ptero.stopIdle`
+
+- VPP checks the player count when you run the command.
+- If the panel rate limit runs out, VPP stops sending signals and tells you. Some empty servers may still be running afterwards.
+
+### `/ptero forcestopall [confirm]`
+::: danger Stops everything
+This sends a stop signal to every server VPP manages. It ignores player counts and `stopIdleIgnore`.
 :::
+
+Permission: `ptero.forcestopall`
+
+1. Run `/ptero forcestopall`. You get a warning.
+2. Run `/ptero forcestopall confirm` within 30 seconds.
+
+From the console, `/ptero forcestopall confirm` runs right away with no 30-second window. Without `confirm`, the console only gets the warning.
+
+The command stops sending signals if the panel rate limit runs out.
+
+### `/ptero forcestartall [confirm]`
+::: danger Heavy on resources
+This sends a start signal to every server VPP manages. Check that your host has enough CPU, RAM and disk I/O first.
+:::
+
+Permission: `ptero.forcestartall`
+
+1. Run `/ptero forcestartall`. You get a warning.
+2. Run `/ptero forcestartall confirm` within 30 seconds.
+
+From the console, `/ptero forcestartall confirm` runs right away. Without `confirm`, the console only gets the warning.
+
+If the panel rate limit runs out, some servers won't get the start signal.
+
+## Access control
+
+### `/ptero unlock <serverName> <password>`
+Uses the single-use start password of a server that has `startPassword` set. After a successful unlock the password is used up, and the player can start the server.
+
+Permission: none. Only players can run it. Players with `ptero.password.bypass` don't need to unlock.
+
+### `/ptero password <set|generate|clear|status> <serverName> [password]`
+Manages start passwords while the proxy runs.
+
+Permission: `ptero.password` or `ptero.reload`
+
+| Action | Effect |
+| --- | --- |
+| `set <serverName> <password>` | Sets a new password. |
+| `generate <serverName>` | Creates a random 12-character password, sets it and shows it to you. |
+| `clear <serverName>` | Removes the password, so the server starts without one. |
+| `status <serverName>` | Shows whether a password is active. |
+
+Passwords set with this command live in memory only. `/ptero reload` and a proxy restart reset them to the `startPassword` values in `config.yml`.
+
+### `/ptero maintenance [server|global] <on|off>`
+Turns VPP's built-in maintenance mode on or off. While maintenance is on, VPP doesn't start the affected servers.
+
+Permission: `ptero.maintenance` or `ptero.reload`
+
+```bash
+/ptero maintenance on              # global
+/ptero maintenance global off
+/ptero maintenance survival on     # one server
+```
+
+- `true` and `false` work in place of `on` and `off`.
+- With no arguments, the command shows the current global and per-server state.
+- VPP saves the state to `maintenance.json`, so it survives restarts.
+- The command refuses when `maintenance.builtinEnabled: false`. External providers, such as kennytv's Maintenance plugin or an addon, can still block starts. See `maintenance.externalProvidersEnabled`.
+
+### `/ptero whitelistReload`
+Fetches `whitelist.json` again for every server with `whitelist: true`. `/ptero reloadwhitelist` does the same.
+
+Permission: `ptero.whitelistReload`
+
+::: warning Not available on MC Server Soft
+VPP can't fetch files from MC Server Soft, so this command and the whitelist feature don't work there.
+:::
+
+## Admin
+
+### `/ptero reload`
+Reloads `config.yml` and the files in `messages/`. Most settings apply without restarting the proxy.
+
+Permission: `ptero.reload`
+
+- VPP rebuilds the panel API client only when the detected panel type or the API key changes. Changes to `apiThreads` or `pterodactyl.url` alone need a proxy restart.
+- The reload also reapplies the maintenance settings, turns the built-in lobby balancer on or off based on `lobbyBalancer.enableBuiltin`, and resets start passwords to the values in the config.
+
+### `/ptero addon [action]`
+Manages VPP addons. `/ptero addons` works too. Without an action, it lists installed addons.
+
+| Action | Permission |
+| --- | --- |
+| `list` (alias `ls`) | `ptero.addon` |
+| `browse` (aliases `catalog`, `market`) | `ptero.addon` |
+| `info <id>` | `ptero.addon` |
+| `install <id>` | `ptero.addon.install` |
+| `update <id>` | `ptero.addon.install` |
+| `uninstall <id>` (alias `remove`) | `ptero.addon.manage` |
+| `enable <id>` / `disable <id>` | `ptero.addon.manage` |
+| `reload [id\|all]` | `ptero.addon.manage` |
+| `help` | `ptero.addon` |
+
+`ptero.reload` grants every action. See [Addons](addons.md) for details.
+
+## Addon commands
+
+Loaded addons can register their own subcommands under `/ptero`, each with its own permission. `/ptero` with no arguments lists them. One example is `/ptero audit` from the move-history addon. It keeps a persistent move and connect log, unlike the in-memory `/ptero history`:
+
+- `/ptero audit [player|uuid]` needs `vpp.audit.use`
+- `/ptero audit clear <player|uuid>` and `/ptero audit export [player|uuid]` also need `vpp.audit.manage` or `ptero.history`
+- The aliases are `/ptero moveaudit` and `/ptero phistory`.

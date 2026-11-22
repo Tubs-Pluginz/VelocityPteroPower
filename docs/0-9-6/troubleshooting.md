@@ -1,181 +1,189 @@
 ---
 title: VPP troubleshooting
 ---
-# Troubleshooting Guide 🛠️
+# Troubleshooting
 
-Steps that actually help when VelocityPteroPower misbehaves.
+Steps to work through when VelocityPteroPower does not behave as expected.
 
-## 1. Preliminary Checks ✅
+## 1. First checks
 
-*   **Latest VPP:** For 0.9.6 pre-release testing, grab the jar from the [GitHub nightly](https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/tag/nightly).
-*   **Velocity 4.3+ / Java 25:** 0.9.6 will not load on Velocity 3 or Java 21. Check `java -version` on the proxy host and `/velocity version`.
+*   **Current build:** while 0.9.6 is in testing, get the jar from the [GitHub nightly](https://github.com/Tubs-Pluginz/VelocityPteroPower/releases/tag/nightly).
+*   **Velocity 4.3+ and Java 25:** 0.9.6 does not load on Velocity 3 or Java 21. Run `java -version` on the proxy host and `/velocity version` in the console.
 
-## 2. Enable debug logging 📝
+## 2. Turn on debug logging
 
-Set `loggerLevel: 10` in `config.yml`, `/ptero reload` (or restart), reproduce the bug, then read lines tagged `[VPP]` / `VelocityPteroPower`.
+Set `loggerLevel: 10` in `config.yml`, run `/ptero reload` (or restart), reproduce the problem, then read the lines from `velocity-ptero-power`.
 
 ::: tip Turn it back down
-Set `loggerLevel: 20` when you are done or the console never shuts up.
+Set `loggerLevel: 20` when you are done. Debug output is noisy.
 :::
 
-## 3. Common Issues & Solutions
+## 3. Common problems
 
-### A. Server Not Starting/Stopping as Expected
+### A. Server does not start or stop
 
-::: details Symptoms & Checklist
-**Symptoms:**
-*   Players attempt to connect to an offline server, but it doesn't start.
-*   An empty server remains online despite `timeout` settings.
-*   Commands like `/ptero start` or `/ptero stop` seem to have no effect.
+::: details Symptoms and checklist
+**Symptoms**
+*   A player connects to an offline server and it does not start.
+*   An empty server stays online past its `timeout`.
+*   `/ptero start` or `/ptero stop` seems to do nothing.
 
-**Checklist:**
-1.  **Configuration Accuracy (`config.yml`):**
-    *   **`servers.<serverName>`:** Does the server name (e.g., `hub`) **exactly match** the name defined in your `velocity.toml`? (This is case-sensitive).
-    *   **`servers.<serverName>.id`:** Is this the correct **short alphanumeric ID** from your panel for that specific server (e.g., `a1b2c3d4` from the panel URL), not a long Docker container ID or full UUID?
-    *   **`pterodactyl.url`:** Is this the full, correct base URL to your panel, including `http://` or `https://` (e.g., `https://panel.example.com/`)?
+**Checklist**
+1.  **`config.yml` entries**
+    *   **`servers.<serverName>`:** the name (for example `hub`) must match the name in `velocity.toml` exactly, including case.
+    *   **`servers.<serverName>.id`:** use the panel's server ID. On Pterodactyl that is the short ID from the server URL (for example `a1b2c3d4`). On Pelican it is the short UUID from Server Details, on Calagopus the full server UUID. It is never the Docker container ID.
+    *   **`pterodactyl.url`:** the full base URL of the panel, including `http://` or `https://` (for example `https://panel.example.com/`).
     *   **`pterodactyl.apiKey`:**
-        *   Is it a **Client API Key** (`ptlc_`, `plcn_`/`pacc_`, or `c7sp_` for Calagopus)?
-        *   **Application API Keys (`ptla_`, `peli_`) are NOT supported.**
-        *   Does the key have the necessary permissions on the panel (e.g., control power signals, read server files if using the whitelist feature)?
-2.  **Panel API Connectivity:**
-    *   From the machine running your Velocity proxy, can you access the panel URL in a browser or via `curl`?
-    *   Check VPP's startup logs (with debug enabled) for messages like "Successfully connected to panel" or errors like "Invalid API Key," "Failed to initialize Panel API Client," or connection timeouts.
-3.  **API Rate Limits:**
+        *   It must be a client API key (`ptlc_`, `plcn_` or `pacc_`, or `c7sp_` for Calagopus).
+        *   Application API keys (`ptla_`, `peli_`) do not work.
+        *   The key needs permission to send power signals, and to read files if you use the whitelist.
+2.  **Panel connection**
+    *   From the proxy machine, open the panel URL in a browser or with `curl`.
+    *   Read the startup log. "Initializing API client for panel type: ..." shows which panel VPP detected from the key prefix. An "Initialization Failed" block or "Failed to initialize Panel API Client" means VPP rejected the key and disabled itself.
+3.  **Rate limits**
     *   Set `printRateLimit: true` in `config.yml`.
-    *   Look for console messages from VPP indicating "Rate limit reached" or "API request blocked due to rate limiting." If you see these, your panel is temporarily throttling requests from VPP.
-4.  **`serverStatusCheckMethod` (`config.yml`):**
-    *   Default is `HYBRID` (panel running **and** ping). If you switched to `VELOCITY_PING`, check IP/port in `velocity.toml` and `pingTimeout`. For `PANEL_API`, the panel must be responsive.
-5.  **Whitelist Feature (for server starting issues):**
-    *   If `whitelist: true` is set for the server in `config.yml`:
-        *   Is the connecting player listed in that server's `whitelist.json` file on the panel?
-        *   If `whitelistAllowBypass: true` is also set, does the player have the `ptero.bypass` permission?
-        *   Remember: Whitelist fetching is **not supported for MC Server Soft panels.**
-6.  **`timeout` / `idleStartShutdownTime` (for server stopping issues):**
-    *   For per-server auto-shutdown: Is `timeout:` in `servers.<serverName>:` set to a positive number (seconds)? A value of `-1` disables it.
-    *   For servers started but never joined: Is `idleStartShutdownTime:` (global) set to a positive number? `-1` disables it.
-7.  **Backend Server Logs (Panel Console):**
-    *   Always check the console output of the actual Minecraft server on the panel. Are there errors there preventing it from starting up correctly or shutting down cleanly? VPP can only send signals; it can't fix underlying issues with the Minecraft server itself.
+    *   "Rate limit reached" warnings, or "API request blocked due to rate limiting" at debug level, mean the panel is throttling VPP.
+4.  **`serverStatusCheckMethod`**
+    *   The default is `HYBRID`: the panel must report running and a ping must succeed. With `VELOCITY_PING`, check the address in `velocity.toml` and `pingTimeout`. With `PANEL_API`, the panel must respond.
+5.  **Whitelist (server does not start)**
+    *   With `whitelist: true` on the server:
+        *   The player must be in that server's `whitelist.json` on the panel.
+        *   With `whitelistAllowBypass: true`, players with `ptero.bypass` skip the check.
+        *   MC Server Soft does not support whitelist fetching.
+6.  **Maintenance and start password (server does not start)**
+    *   A server in maintenance is never started for players.
+    *   A server with a `startPassword` needs `/ptero unlock <server> <password>` first, unless the player has `ptero.password.bypass`.
+7.  **`timeout` and `idleStartShutdownTime` (server does not stop)**
+    *   For shutdown after players leave, the server's `timeout:` must be a positive number of seconds. `-1`, or no `timeout` key, turns it off.
+    *   For servers started but never joined, `idleStartShutdownTime:` must be a positive number. `-1` turns it off. Lobbies, limbos and servers with `timeout: -1` are never stopped this way.
+    *   Servers in `alwaysOnline`, and servers whose group peers have players, are not stopped.
+8.  **Backend console on the panel**
+    *   Read the Minecraft server's own console. VPP only sends power signals. If the server crashes on startup or hangs on shutdown, the cause is on the backend.
 :::
 
-### B. Limbo Server Functionality Issues
+### B. Limbo problems
 
-::: details Symptoms & Checklist
-**Symptoms:**
-*   Players are disconnected instead of being sent to the limbo server.
-*   Players are sent to limbo but never transferred to the target server.
+::: details Symptoms and checklist
+**Symptoms**
+*   Players get disconnected instead of sent to the limbo.
+*   Players land on the limbo but never move to the target server.
 
-**Checklist:**
-1.  **`lobbyBalancer.limbos` / `sendToLimboOnStart`:** names must match `velocity.toml`. With limbos listed, send-to-limbo defaults on.
-2.  **Reachable limbo:** `/server <limbo>` works. Prefer `alwaysOnline: [limbo]` so the waiting room is not cold.
-3.  **Logs:** look for holding redirects and watcher timeout / settle messages (`loggerLevel: 10`).
-4.  **Poll vs settle:** raise `startupJoinDelay` if players transfer too early; keep `startupPollInterval` for how often VPP asks "are you up?".
+**Checklist**
+1.  **`lobbyBalancer.limbos` and `sendToLimboOnStart`:** the names must match `velocity.toml`. When limbos are listed, `sendToLimboOnStart` is on unless you set it to `false`.
+2.  **Reachable limbo:** `/server <limbo>` must work. Put the limbo in `alwaysOnline` so it does not need a cold start itself.
+3.  **Forced-host joins:** a player who joins the proxy straight into an offline server is disconnected when no limbo or lobby is reachable. With `sendToLimboOnStart: false`, `forcedHostOfflineBehavior` decides (`DISCONNECT` disconnects them).
+4.  **Players leaving the limbo:** a queued player who moves to any server other than a lobby, a limbo or the target loses their place.
+5.  **Logs:** with `loggerLevel: 10`, look for "Redirecting player ... to holding server", "Settling", and "did not come online within the expected time".
+6.  **Poll interval and join delay:** raise `startupJoinDelay` if players are moved too early. `startupPollInterval` only sets how often VPP checks whether the server is up.
 :::
 
-### C. Whitelist Feature Not Working Correctly
+### C. Whitelist does not work
 
-::: details Symptoms & Checklist
-**Symptoms:**
-*   Players who should be whitelisted are denied by VPP (or vice-versa).
-*   The `/ptero whitelistReload` command shows errors or doesn't seem to update.
+::: details Symptoms and checklist
+**Symptoms**
+*   VPP denies players who should be on the whitelist, or lets in players who should not be.
+*   `/ptero whitelistReload` shows errors or changes nothing.
 
-**Checklist:**
-1.  **`whitelist: true`:** Is this set for the specific server(s) in the `servers:` section of `config.yml`?
-2.  ::: danger MC Server Soft Incompatibility
-    The panel API functionality required for VPP to fetch `whitelist.json` is **not available on MC Server Soft panels.** If VPP detects this panel type, the whitelist feature will be effectively disabled, and warnings may be logged.
+**Checklist**
+1.  **`whitelist: true`:** it must be set on the server under `servers:` in `config.yml`.
+2.  ::: danger MC Server Soft
+    MC Server Soft's API cannot serve files, so VPP cannot fetch `whitelist.json` there. When VPP detects MC Server Soft, it logs a warning and turns whitelist checks off.
     :::
-3.  **Panel API Key Permissions:** Your Client API Key (`ptlc_`, `plcn_`/`pacc_`, or `c7sp_`) **must** have permissions on the panel to **read server files** (specifically, to access `whitelist.json` for the relevant servers).
-4.  **File Path & Name:** VPP expects the whitelist file to be named exactly `whitelist.json` and located in the **root directory** of the Minecraft server's files on the panel.
-5.  **`whitelist.json` Format:** Is the `whitelist.json` file on the panel correctly formatted JSON? (e.g., `[{"uuid": "...", "name": "..."}, ...]`)
-6.  **VPP Logs (Debug Enabled):** Look for:
-    *   "Fetching whitelist for server `serverName`..."
+3.  **Key permissions:** the client API key (`ptlc_`, `plcn_` or `pacc_`, or `c7sp_`) must be allowed to read files on the servers that use the whitelist.
+4.  **File name and location:** the file must be named `whitelist.json` and sit in the root directory of the Minecraft server's files on the panel.
+5.  **File format:** `whitelist.json` must be valid JSON, for example `[{"uuid": "...", "name": "..."}, ...]`.
+6.  **Logs (debug on):** look for:
+    *   "Fetching whitelist for server ..."
     *   "Updated whitelist for server `serverName`: `X` players"
-    *   Error messages like "Failed to fetch whitelist for server...", "Error parsing whitelist JSON...", or "Whitelist file not found for server...".
-7.  **`whitelistCheckInterval`:** If you expect periodic automatic updates, ensure this is set to a positive value (in minutes).
+    *   "Failed to fetch whitelist for server ...", "Error parsing whitelist JSON ..." or "Whitelist file not found for server ...".
+7.  **`whitelistCheckInterval`:** for automatic refreshes, set it to a positive number of minutes.
 :::
 
-### D. HTTP/2 "GOAWAY" Errors in Logs
+### D. HTTP/2 "GOAWAY" errors in the log
 
-::: details Symptoms & Explanation
-**Symptoms:**
-*   Debug logs show messages containing "GOAWAY" during API requests to the panel.
+::: details Symptoms and explanation
+**Symptoms**
+*   Debug logs show "GOAWAY" during panel API requests.
 
-**Explanation:**
-This typically indicates a temporary issue with the HTTP/2 connection between your Velocity server and the panel. It can be caused by the panel itself, network intermediaries (like reverse proxies or Cloudflare), or transient network conditions. VPP includes some internal retry logic for these specific errors.
+**Explanation**
+The panel, or something between the proxy and the panel (a reverse proxy, Cloudflare, an unstable network), closed the HTTP/2 connection. VPP retries status checks that fail with GOAWAY a few times before it gives up.
 
-**Solutions:**
-*   Often, these are transient and may resolve themselves.
-*   If persistent:
-    *   Check the health and logs of your panel.
-    *   Investigate the network path between your Velocity server and the panel.
-    *   If using Cloudflare or another reverse proxy in front of your panel, check its configuration and logs for any HTTP/2 related issues or connection resets.
+**What to do**
+*   Occasional GOAWAY lines are harmless.
+*   If they keep coming:
+    *   Check the panel's health and logs.
+    *   Check the network path between the proxy and the panel.
+    *   If Cloudflare or another reverse proxy sits in front of the panel, check its settings and logs for HTTP/2 problems or connection resets.
 :::
 
-### E. Plugin Fails to Load or Throws Errors on Velocity Startup
+### E. Plugin does not load or throws errors on startup
 
-::: details Symptoms & Checklist
-**Symptoms:**
-*   VelocityPteroPower does not appear in `/velocity plugins`.
-*   Errors related to `de.tubyoub.velocitypteropower` appear in the console during Velocity's startup sequence.
+::: details Symptoms and checklist
+**Symptoms**
+*   VelocityPteroPower is missing from `/velocity plugins`.
+*   Errors mentioning `de.tubyoub.velocitypteropower` appear while Velocity starts.
 
-**Checklist:**
-1.  **Java / Velocity:** 0.9.6 needs **Java 25** and **Velocity 4.3+**. `java -version` and `/velocity version` first.
-2.  **Corrupted JAR:** Re-download the shaded jar from Modrinth / GitHub Releases.
-3.  **Incomplete Upload:** Make sure the full file landed in `plugins/`.
-4.  **File Permissions:** The Velocity process must be able to read the jar.
-5.  **Broken `config.yml`:** Back it up, delete it, let VPP rewrite defaults, then re-apply settings.
-6.  **Conflicting Plugins (rare):** Another plugin shading incompatible shared libraries can break load order. If VPP only fails when a specific plugin is present, investigate that combo.
+**Checklist**
+1.  **Java and Velocity:** 0.9.6 needs Java 25 and Velocity 4.3+. Check `java -version` and `/velocity version` first.
+2.  **Damaged jar:** download it again from the GitHub nightly or Modrinth.
+3.  **Incomplete upload:** check that the whole file arrived in `plugins/`.
+4.  **File permissions:** the Velocity process must be able to read the jar.
+5.  **Broken `config.yml`:** back it up, delete it, let VPP write a fresh one, then copy your settings back.
+6.  **Plugin conflicts (rare):** another plugin that bundles incompatible copies of shared libraries can break loading. If VPP fails only when a certain plugin is installed, test without that plugin.
 :::
 
-### F. Server appears stuck in "starting"
+### F. Server stays in "starting"
 
-::: details Symptoms & Checklist
-**Symptoms:**
-*   Players see messages that a server is starting, but it never seems to finish.
+::: details Symptoms and checklist
+**Symptoms**
+*   Players are told a server is starting, but it never finishes.
 *   Later attempts keep saying the server is starting.
 
-**What VPP does:**
-*   A cleanup sweep (~60s) clears "starting" when the panel shows online, or when the startup window / `startupTimeoutSeconds` has elapsed (`CANCEL` clears waiters + starting; `KEEP_STARTING` clears waiters only).
+**What VPP does**
+*   When the startup wait runs out (`startupInitialCheckDelay` + `startupTimeoutSeconds`), VPP tells the waiting players and clears the queue. With `startupTimeoutPolicy: CANCEL` it also clears the starting state. With `KEEP_STARTING` the server stays marked as starting.
+*   A cleanup sweep runs every 60 seconds. It clears the starting state when the server is online, or when nobody is waiting and the start is older than `startupInitialCheckDelay` + `startupTimeoutSeconds` + 10 seconds.
+*   If the panel websocket reports the server as offline after a start (for example, someone stopped it on the panel), VPP sends a new start for the players still waiting.
 
-**Checklist:**
-1.  Debug logs for watcher timeout / settle / soft-requeue.
-2.  Confirm `HYBRID` / ping / panel status matches reality.
+**Checklist**
+1.  Look at the debug log for timeout, settle and soft requeue messages.
+2.  Check that the `HYBRID` result (panel state and ping) matches what you see on the panel.
 3.  Read the backend console on the panel for real startup failures.
-4.  `printRateLimit: true` if status checks look starved.
-5.  Soft-requeue only helps early `SERVER_DISCONNECTED` kicks — raise `startupJoinDelay` if the world is still loading.
+4.  Set `printRateLimit: true` if status checks seem to stall.
+5.  Soft requeue only helps with kicks right after the transfer that carry no message. If the world is still loading when players arrive, raise `startupJoinDelay`.
 :::
 
-### G. Addon install / browse looks wrong
+### G. Addon install or browse looks wrong
 
-::: details Symptoms & Checklist
-**Symptoms:**
-*   `/ptero addon browse` shows an addon as missing even though a jar is in the folder.
-*   Catalog install fails.
+::: details Symptoms and checklist
+**Symptoms**
+*   `/ptero addon browse` shows an addon as not installed although its jar is in the folder.
+*   Installing from the catalog fails.
 
-**Checklist:**
-1.  Jars belong in `plugins/velocity-ptero-power/addons/` (not Velocity's root `plugins/`).
-2.  Catalog install pulls GitHub Release assets from the `nightly` prerelease — that release must exist and include the addon jar.
-3.  Browse treats a successfully loaded jar as installed even if you dropped it by hand.
-4.  Sample addon has no catalog download URL; build it locally if you need it.
+**Checklist**
+1.  Addon jars go in `plugins/velocity-ptero-power/addons/`, not in Velocity's `plugins/` folder.
+2.  Catalog installs download from the GitHub `nightly` prerelease. That release must exist and contain the addon jar.
+3.  `browse` shows a jar as installed only when it loaded. Check the startup log for load errors, such as an API major version mismatch.
+4.  The sample addon is not in the catalog. Build it yourself if you need it.
 :::
 
-## 4. Providing Information for Support 🆘
+## 4. Asking for support
 
-If you're still stuck, ask in the [Support Discord](https://discord.pluginz.dev). Bring:
+If you are still stuck, ask on the [support Discord](https://discord.pluginz.dev). Bring:
 
-*   **VelocityPteroPower Version:** (e.g., `0.9.6`)
-*   **Velocity Version:** (e.g., `4.3.1` — from `/velocity version`)
-*   **Panel Type & Version:** (e.g., Pterodactyl 1.11.5, Pelican, Calagopus)
-*   **Java Version:** (must be 25 for 0.9.6)
-*   **Your `config.yml`:**
-    ::: danger Mask API Key!
-    Before sharing your `config.yml`, **ALWAYS MASK YOUR `apiKey`** like this:
+*   **VelocityPteroPower version** (for example `0.9.6`)
+*   **Velocity version** (for example `4.3.1`, from `/velocity version`)
+*   **Panel type and version** (for example Pterodactyl 1.11.5, Pelican, Calagopus)
+*   **Java version** (must be 25 for 0.9.6)
+*   **Your `config.yml`**
+    ::: danger Mask the API key
+    Before you share `config.yml`, **always mask your `apiKey`**, like this:
     `apiKey: "ptlc_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"`
     :::
-    *   Prefer [Pastebin](https://pastebin.com/) with the key masked.
-*   **Language files** under `plugins/velocity-ptero-power/messages/<lang>.yml` if the issue is message-related.
-*   **Debug console logs** (`loggerLevel: 10`) from proxy start through the failure — upload to [mclo.gs](https://mclo.gs/).
-    ::: tip Do Not Paste Directly
-    Please **do not** paste long logs or configs into Discord. Use the links above.
+    *   Share it through [Pastebin](https://pastebin.com/) with the key masked.
+*   **Language files** from `plugins/velocity-ptero-power/messages/<lang>.yml`, if the problem is about messages.
+*   **Debug logs** (`loggerLevel: 10`) from proxy start until the failure, uploaded to [mclo.gs](https://mclo.gs/).
+    ::: tip Use a paste site
+    Do not paste long logs or configs straight into Discord. Use the links above.
     :::
-*   **What you expected vs what happened**, plus any player-facing errors.
-*   **Steps to reproduce** if you have them.
+*   **What you expected and what happened**, including any messages players saw.
+*   **Steps to reproduce**, if you have them.

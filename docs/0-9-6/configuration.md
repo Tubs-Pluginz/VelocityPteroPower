@@ -2,389 +2,673 @@
 title: VPP config
 sidebar: true
 ---
-# Configuration Guide ⚙️
+# Configuration guide
 
-File: `plugins/velocity-ptero-power/config.yml` (written on first start).
+VPP writes `plugins/velocity-ptero-power/config.yml` on first start.
 
-::: tip Backup first
-Copy `config.yml` before large edits. Reloads apply most keys; `apiThreads` still wants a restart.
+::: tip Back up first
+Copy `config.yml` before large edits. `/ptero reload` applies most keys. `apiThreads` and `pterodactyl.url` need a proxy restart.
 :::
 
-0.9.6 defaults worth noticing: `serverStatusCheckMethod: HYBRID`, startup poll/timeout knobs, and `sendToLimboOnStart` when limbos exist. Panel keys may be `ptlc_`, `plcn_`/`pacc_`, or `c7sp_` (Calagopus).
+Defaults to know about in 0.9.6: `serverStatusCheckMethod` is `HYBRID`, the startup poll and timeout settings are new, and `sendToLimboOnStart` turns on when you list limbos. API keys can start with `ptlc_`, `plcn_`/`pacc_`, or `c7sp_` (Calagopus).
+
+When a plugin update adds keys, VPP adds them to your `config.yml` on the next start and keeps your values. Your `servers`, `profiles` and `serverGroups` sections stay as you wrote them.
+
+The defaults below are the values in the shipped `config.yml`. Where VPP uses a different value for a key that is missing from the file, the entry says so.
 
 ---
 
-## General Settings
+## General settings
 
 ### `fileversion`
-*   **Description:** Internal version number for the configuration file. This is used by the plugin to automatically manage updates to the config structure between plugin versions.
-*   **Action:** **Do not change this value manually.**
-*   **Default:** (Automatically set by the plugin, e.g., `17`)
+VPP uses this number to update the config structure between plugin versions. Don't change it.
+
+Default: set by the plugin (`17` in 0.9.6).
 
 ### `checkUpdate`
-*   **Description:** If `true`, the plugin will check for new versions of VelocityPteroPower on startup. If an update is found, a message will be displayed in the console.
-*   **Type:** `Boolean`
-*   **Default:** `true`
-*   **Example:** `checkUpdate: true`
+If `true`, VPP checks Modrinth for a newer version on startup and logs a message to the console when it finds one.
 
-### `loggerLevel`
-*   **Description:** Controls the verbosity of messages logged by VelocityPteroPower to the Velocity console.
-*   **Type:** `Integer`
-*   **Accepted Values:**
-    *   `10`: DEBUG (Most detailed information, useful for troubleshooting issues)
-    *   `20`: INFO (Standard operational messages, recommended for production)
-    *   `30`: WARNING (Potential issues or non-critical errors)
-    *   `40`: ERROR (Critical errors that may impair functionality)
-*   **Default:** `20`
-*   **Example:** `loggerLevel: 20`
-    ::: tip For Troubleshooting
-    When reporting issues, setting `loggerLevel: 10` can provide valuable diagnostic information. Remember to set it back to `20` for normal operation to avoid excessive console spam.
-    :::
-
-### `apiThreads`
-*   **Description:** Threads for the plugin's HTTP/API executor. VPP auto-scales the pool to roughly `2 x (number of managed servers)`, clamped to a minimum of `4` and a maximum of `64`. If you set `apiThreads` higher than this auto baseline, your configured value overrides the baseline and will be used instead.
-*   **Type:** `Integer`
-*   **Default:** `10`
-*   **Action:** Requires a reload/restart to take effect.
-*   **Formula:** `baseline = clamp(servers * 2, 4, 64)`; `final = max(apiThreads, baseline)`
-*   **Examples:**
-    * 3 servers → baseline `6` → final uses `max(apiThreads, 6)`
-    * 20 servers → baseline `40` → final uses `max(apiThreads, 40)`
-    * 40 servers → baseline `64` (clamped) → final uses `max(apiThreads, 64)`
-    * You set `apiThreads: 100` → final `100` (overrides baseline)
-*   **Command:** Use `/ptero apithreads` (permission: `ptero.info`) to display the configured value, server count, baseline, and the value currently in use.
-
-### `printRateLimit`
-*   **Description:** If `true`, the plugin will log information about the current API rate limit status (limit, remaining requests) received from the panel after API calls. This is useful for diagnosing if API rate limiting is affecting the plugin's operation.
-*   **Type:** `Boolean`
-*   **Default:** `false`
-*   **Example:** `printRateLimit: false`
+Type: `Boolean`. Default: `true`.
 
 ### `languageOverride`
-*   **Description:** Override the language used for plugin messages. Set to a locale like `"en_US"` or `"de_DE"` to force a specific language. Use `"auto"` to follow the environment (system/Velocity) language.
-*   **Type:** `String`
-*   **Default:** `auto`
-*   **Example:** `languageOverride: en_US`
-*   **Notes:** Message files are stored under `plugins/velocity-ptero-power/messages/<lang>.yml`. A legacy single `messages.yml` file is no longer used.
+Sets the language for plugin messages. Use a locale such as `"en_US"` or `"de_DE"`, or `"auto"` to follow the environment. See [Messages and localization](#messages-and-localization).
+
+Type: `String`. Default: `auto`.
+
+```yaml
+languageOverride: en_US
+```
+
+### `loggerLevel`
+Sets how much VPP logs to the Velocity console.
+
+Type: `Integer`. Default: `20`.
+
+| Value | Level | Use |
+| --- | --- | --- |
+| `10` | DEBUG | Troubleshooting. Logs the most detail. |
+| `20` | INFO | Normal operation. |
+| `30` | WARNING | Possible problems and non-critical errors. |
+| `40` | ERROR | Only errors that stop something from working. |
+
+::: tip Troubleshooting
+Set `loggerLevel: 10` before you collect logs for a bug report. Set it back to `20` afterwards, or the console fills up.
+:::
+
+### `apiThreads`
+Sets the number of threads for HTTP requests to the panel. VPP computes a baseline of 2 threads per managed server, clamped between 4 and 64, and uses whichever is larger: the baseline or `apiThreads`.
+
+Type: `Integer`. Default: `10`.
+
+```text
+baseline = clamp(servers * 2, 4, 64)
+final    = max(apiThreads, baseline)
+```
+
+| Servers | Baseline | Threads used |
+| --- | --- | --- |
+| 3 | 6 | `max(apiThreads, 6)` |
+| 20 | 40 | `max(apiThreads, 40)` |
+| 40 | 64 (clamped) | `max(apiThreads, 64)` |
+| any, with `apiThreads: 100` | | at least `100` |
+
+VPP sizes the pool when it creates the API client. A reload only recreates the client when the panel type or API key changes, so restart the proxy after you change `apiThreads`. Run `/ptero apithreads` (permission `ptero.info`) to see the configured value, the server count, the baseline and the thread count in use.
+
+### `printRateLimit`
+If `true`, VPP logs the panel's rate limit and remaining requests after each API call. Turn it on when you suspect the rate limit is slowing VPP down.
+
+Type: `Boolean`. Default: `false`.
 
 ---
 
-## Server Status & Behavior
+## Server status and startup
 
 ### `serverStatusCheckMethod`
-*   **Description:** Determines how VPP checks if a managed Minecraft server is online and ready.
-*   **Type:** `String`
-*   **Accepted Values:**
-    *   `"VELOCITY_PING"`: Uses Velocity's built-in server pinging mechanism.
-        *   **Pros:** Less resource-intensive on the panel API; doesn't consume API rate limit quotas.
-        *   **Cons:** Requires the server to be correctly registered in `velocity.toml` and network-accessible from the proxy. Might report a server as "online" slightly before it's fully joinable (e.g., before all backend plugins load). Some very minimal limbo servers might not respond to pings correctly.
-    *   `"PANEL_API"`: Queries Pterodactyl / Pelican / Calagopus / MC Server Soft for process state.
-        *   Accurate for panel "running", burns rate limit.
-    *   `"HYBRID"`: Panel must report running **and** Velocity ping must succeed.
-        *   Best default for avoiding half-ready joins.
-*   **Default:** `"HYBRID"`
-*   **Example:** `serverStatusCheckMethod: "HYBRID"`
+Sets how VPP decides that a server is online and ready. You can override it per server or per profile.
+
+Type: `String`. Default: `"HYBRID"`.
+
+| Value | How it works | Trade-off |
+| --- | --- | --- |
+| `"VELOCITY_PING"` | Pings the server through Velocity. | Costs no API requests. The server must be registered in `velocity.toml` and reachable from the proxy. It can report online before backend plugins finish loading, and some minimal limbo servers don't answer pings. |
+| `"PANEL_API"` | Asks the panel for the process state. | Matches the panel's "running" state, but every check uses an API request. |
+| `"HYBRID"` | Needs both: the panel reports running and the ping succeeds. | Avoids sending players to a half-started server. |
 
 ### `pingTimeout`
-*   **Description:** If `serverStatusCheckMethod` is set to `"VELOCITY_PING"`, this is the maximum time (in milliseconds) VPP will wait for a ping response from a backend server before considering it offline or unreachable.
-*   **Type:** `Integer` (milliseconds)
-*   **Default:** `1000` (1 second)
-*   **Example:** `pingTimeout: 1000`
+How long VPP waits for a ping answer before it treats the server as offline, in milliseconds. It applies to `VELOCITY_PING` and to the ping half of `HYBRID`.
 
-### `shutdownRetries`
-*   **Description:** If VPP sends a "stop" signal to a server and the server doesn't appear to shut down (based on subsequent status checks), VPP will retry sending the "stop" signal this many times.
-*   **Type:** `Integer`
-*   **Default:** `3`
-*   **Example:** `shutdownRetries: 3`
-
-### `shutdownRetryDelay`
-*   **Description:** The time (in seconds) VPP will wait between failed shutdown attempts before retrying.
-*   **Type:** `Integer` (seconds)
-*   **Default:** `300` (5 minutes)
-*   **Example:** `shutdownRetryDelay: 300`
-
-### `idleStartShutdownTime`
-*   **Description:** If a server is started by VPP (either by a player connecting or via command) but no player successfully joins it within this duration (in seconds), VPP will automatically shut it down. This prevents servers from staying online indefinitely if they were started but never actually used.
-*   **Type:** `Integer` (seconds)
-*   **Set to `-1` to disable this feature.**
-*   **Default:** `300` (5 minutes)
-*   **Example:** `idleStartShutdownTime: 300`
-
-### `playerStartCooldown`
-*   **Description:** The cooldown period (in seconds) a player must wait before they can initiate the start of another server, does not work for the `/ptero start` command.
-*   **Type:** `Integer` (seconds)
-*   **Default:** `10`
-*   **Example:** `playerStartCooldown: 10`
-
-### Limbo servers
-*   Use `lobbyBalancer.limbos` for waiting rooms while a target starts. Legacy `limboServer` migrates automatically.
-*   **`sendToLimboOnStart`:** defaults to **true** when `limbos` is non-empty after load (otherwise false). Falls back to a configured lobby if limbo pick fails.
-*   Keep limbos light; put them in `alwaysOnline` if you can.
+Type: `Integer`. Default: `1000`.
 
 ### `startupInitialCheckDelay`
-*   **Description:** Seconds to wait after a start signal before the first online poll.
-*   **Type:** `Integer` (seconds)
-*   **Default:** `10`
-*   **Example:** `startupInitialCheckDelay: 10`
+Seconds to wait after sending a start signal before the first online check. A lightweight limbo that starts fast can use a lower value.
+
+Type: `Integer`. Default: `10`.
 
 ### `startupPollInterval`
-*   **Description:** How often (seconds) to poll while waiting for a server to come online. Independent of `startupJoinDelay`.
-*   **Type:** `Integer` (seconds)
-*   **Default:** `5`
-*   **Per-server:** optional `startupPollInterval` under `servers.<name>` or a profile.
+How often, in seconds, VPP checks whether a starting server is online. You can override it per server or per profile. The minimum is `1`.
+
+Type: `Integer`. Default: `5`.
 
 ### `startupTimeoutSeconds`
-*   **Description:** Max seconds to wait for online after a start signal before applying `startupTimeoutPolicy`.
-*   **Type:** `Integer` (seconds, minimum 30)
-*   **Default:** `180`
-*   **Per-server:** optional override.
+The longest VPP waits for a server to come online after a start signal. When the time runs out, VPP applies `startupTimeoutPolicy`. You can override it per server or per profile. Values below `30` count as `30`.
+
+Type: `Integer`. Default: `180`.
 
 ### `startupTimeoutPolicy`
-*   **Description:** What happens when the timeout fires.
-*   **Values:** `CANCEL` (clear waiters + starting state) or `KEEP_STARTING` (clear waiters, leave starting so players can re-queue).
-*   **Default:** `CANCEL`
+What VPP does when `startupTimeoutSeconds` runs out.
 
-### `softRequeueGraceSeconds` / `softRequeueMaxAttempts`
-*   **Description:** After transfer, if the backend kicks with `SERVER_DISCONNECTED` within the grace window, settle again instead of giving up (up to max attempts).
-*   **Defaults:** `30` / `3`
+Type: `String`. Default: `CANCEL`. An invalid value falls back to `CANCEL`.
 
-### `rateLimitBackgroundPauseThreshold` / `rateLimitProbeFallbackSeconds`
-*   **Description:** Pause prefetch when remaining requests are low (or waiters exist). If the panel never sends reset headers, wait this many seconds before probing again at remaining 0.
-*   **Defaults:** `5` / `60`
+| Value | Effect |
+| --- | --- |
+| `CANCEL` | Clears the waiting players and the server's starting state. |
+| `KEEP_STARTING` | Clears the waiting players but keeps the starting state, so players can queue again. |
 
-::: info Note
-Per-server `startupJoinDelay` is the **post-online settle** delay before auto-connect. Do not use it as a poll interval — that is `startupPollInterval`.
+::: info Join delay and poll interval
+The per-server `startupJoinDelay` is how long VPP waits after the server is online before it moves players there. It is not a poll interval. The poll interval is `startupPollInterval`.
 :::
 
-### `stopIdleIgnore`
-*   **Description:** A list of server names (as defined in `velocity.toml` and VPP's `servers` section) that will be ignored by the `/ptero stopidle` command. These servers will not be shut down by this specific command even if they are empty.
-*   **Type:** `List` of `String`
-*   **Default:** `["hub", "lobby", "limbo"]`
-*   **Example:**
-    ```yaml
-    stopIdleIgnore:
-      - lobby1
-      - lobby2
-      - hub
-    ```
-    ::: warning Important
-    This list **only** affects the `/ptero stopidle` command. It does **not** prevent automatic shutdown based on a server's `timeout` setting or the global `idleStartShutdownTime`. It also does not affect the `/ptero forcestopall` command.
-    :::
+### `softRequeueGraceSeconds`
+After VPP moves a waiting player to the started server, a kick with `SERVER_DISCONNECTED` within this many seconds puts the player back in the queue instead of cancelling.
 
-### `serverNotFoundMessage`
-*   **Description:** If `true`, when a player attempts to connect to a server name that is registered in `velocity.toml` but *not* configured in VPP's `servers` section, the player will receive a "server not found in configuration" message. A message is always logged to the console regardless of this setting.
-*   **Type:** `Boolean`
-*   **Default:** `false`
-*   **Example:** `serverNotFoundMessage: false`
+Type: `Integer`. Default: `30`.
 
-### `maxOnlineServers`
-*   **Description:** Limits how many managed servers may be online concurrently. `0` means unlimited.
-*   **Type:** `Integer`
-*   **Default:** `0`
-*   **Example:** `maxOnlineServers: 3`
+### `softRequeueMaxAttempts`
+How many times VPP requeues a player this way before it gives up.
 
-### `maxOnlineAllowBypass`
-*   **Description:** If `true`, players with the `ptero.maxcap.bypass` permission can bypass the `maxOnlineServers` cap.
-*   **Type:** `Boolean`
-*   **Default:** `true`
-*   **Example:** `maxOnlineAllowBypass: true`
+Type: `Integer`. Default: `3`.
 
-### `maxOnlineExempt`
-*   **Description:** A list of server names that are exempt from the `maxOnlineServers` cap.
-*   **Type:** `List` of `String`
-*   **Default:** `["hub", "lobby", "limbo"]`
-*   **Example:**
-    ```yaml
-    maxOnlineExempt:
-      - hub
-      - lobby
-      - limbo
-    ```
+### `persistentQueueEnabled`
+If `true`, VPP saves the start-wait queues to `startup-queue.json`, so a player who disconnects can pick up their place when they reconnect.
 
-### `countLobbiesInMaxOnline`
-*   Description: If true, lobbies defined under lobbyBalancer.lobbies are counted toward the global maxOnlineServers cap. If false, those lobbies are excluded automatically when enforcing the cap.
-*   Type: Boolean
-*   Default: false
-*   Notes: Only managed servers (listed under servers:) are counted by the cap at all. If lobbiesToUse > 0, only the first N lobbies are affected by this setting.
+Type: `Boolean`. Default: `true`.
 
-### `countLimbosInMaxOnline`
-*   Description: If true, limbos (from `lobbyBalancer.limbos`) are counted toward `maxOnlineServers`. If false, they are excluded automatically when enforcing the cap.
-*   Type: Boolean
-*   Default: false
+### `persistentQueueTtlSeconds`
+How long a disconnected player's queue entry stays valid, in seconds. The minimum is `60`.
 
-### `alwaysOnline`
-*   **Description:** A list of server names that VPP should keep online at all times. The plugin will periodically check and start them if offline. This setting **outranks** per-server `timeout`, i.e., such servers will not be auto-shutdown.
-*   **Type:** `List` of `String`
-*   **Default:** `["limbo"]`
-*   **Example:**
-    ```yaml
-    alwaysOnline:
-      - limbo
-    ```
+Type: `Integer`. Default: `900` (15 minutes).
 
-### `alwaysOnlineCheckInterval`
-*   **Description:** How often to check/enforce the `alwaysOnline` list (in seconds).
-*   **Type:** `Integer` (seconds)
-*   **Default:** `60`
-*   **Example:** `alwaysOnlineCheckInterval: 60`
+---
+
+## Panel API usage
+
+### `rateLimitBackgroundPauseThreshold`
+VPP pauses background prefetching when the remaining API requests drop to this number, or while players are waiting for a start.
+
+Type: `Integer`. Default: `5`.
+
+### `rateLimitProbeFallbackSeconds`
+If the panel never sends an `X-RateLimit-Reset` header, VPP waits this many seconds before it tries again once the remaining requests reach 0. The minimum is `10`.
+
+Type: `Integer`. Default: `60`.
+
+### `panelWebSocketEnabled`
+If `true`, VPP subscribes to the Wings websockets of Pterodactyl, Pelican and Calagopus to get live server state. This cuts down on polling.
+
+Type: `Boolean`. Default: `true`.
+
+### `panelWebSocketRefreshSeconds`
+How often VPP checks and renews the websocket subscriptions, in seconds. The minimum is `30`.
+
+Type: `Integer`. Default: `120`.
+
+### `serverStateCacheTtlSeconds`
+How long VPP trusts a server state it got from the websocket, in seconds. The minimum is `5`.
+
+Type: `Integer`. Default: `30`.
 
 ### `resourceCacheSeconds`
-*   **Description:** How long to cache resource usage responses from the panel (in seconds). Set to `0` to disable caching.
-*   **Type:** `Integer` (seconds)
-*   **Default:** `10`
-*   **Example:** `resourceCacheSeconds: 10`
+How long VPP caches resource usage from the panel, in seconds. `0` turns the cache off.
+
+Type: `Integer`. Default: `10`.
 
 ### `resourcePrefetchEnabled`
-*   **Description:** If `true`, VPP will periodically prefetch resource usage for all managed servers every `resourceCacheSeconds`, keeping the cache warm so commands like `/ptero list` and `/ptero info` feel snappy.
-*   **Type:** `Boolean`
-*   **Default:** `true`
-*   **Example:** `resourcePrefetchEnabled: true`
+If `true`, VPP fetches resource usage for all managed servers every `resourceCacheSeconds`, so `/ptero list` and `/ptero info` answer from the cache.
+
+Type: `Boolean`. Default: `true`.
+
+---
+
+## Shutdown
+
+### `shutdownRetries`
+If VPP sends a stop signal and the server doesn't shut down, VPP sends it again up to this many times.
+
+Type: `Integer`. Default: `3`.
+
+### `shutdownRetryDelay`
+Seconds between shutdown retries.
+
+Type: `Integer`. Default: `300` (5 minutes). If the key is missing, VPP uses `30`.
+
+### `idleStartShutdownTime`
+If VPP starts a server and nobody joins it within this many seconds, VPP stops it again. This applies whether a player connection or a command started the server. `-1` turns it off.
+
+Type: `Integer`. Default: `300` (5 minutes).
 
 ### `idleShutdownCheckInterval`
-*   **Description:** Periodic failsafe sweep interval (in seconds). VPP scans all managed servers and schedules idle shutdowns for empty ones (respecting `alwaysOnline`, per-server `timeout`, and only when the server is online). Set to `0` or a negative number to disable.
-*   **Type:** `Integer` (seconds)
-*   **Default:** `60`
-*   **Example:** `idleShutdownCheckInterval: 60`
+A backup sweep, in seconds. VPP checks all online managed servers and schedules an idle shutdown for each empty one, following `alwaysOnline` and the per-server `timeout`. It catches shutdowns that a missed event would otherwise skip. `0` or a negative value turns it off.
 
-### Lifecycle
+Type: `Integer`. Default: `60`.
 
-#### `lifecycle.shutdownOnProxyExit`
-*   **Description:** Defines which servers should be force-stopped when the Velocity proxy shuts down. This setting overrides `alwaysOnline` during shutdown.
-*   **Type:** `List` of `String`
-*   **Accepted values:**
-    *   `all` — stop all managed servers
-    *   or a list of specific server names to stop
-*   **Default:** disabled (empty list)
-*   **Example:**
-    ```yaml
-    lifecycle:
-      shutdownOnProxyExit:
-        - lobby
-        - survival
-    ```
-    or to stop everything:
-    ```yaml
-    lifecycle:
-      shutdownOnProxyExit:
-        - all
-    ```
+### `stopIdleIgnore`
+Servers that `/ptero stopidle` leaves running, even when they are empty. Use the server names from `velocity.toml` and the `servers` section.
 
-::: info Always-online on startup
-Servers listed in `alwaysOnline` will be started automatically on proxy startup (once) and then kept online by periodic maintenance.
+Type: `List` of `String`. Default: `["hub", "lobby", "limbo"]`.
+
+```yaml
+stopIdleIgnore:
+  - lobby1
+  - lobby2
+  - hub
+```
+
+::: warning Only for /ptero stopidle
+This list has no effect on the automatic shutdown from `timeout` or `idleStartShutdownTime`, and none on `/ptero forcestopall`.
 :::
+
+### `lifecycle.shutdownOnProxyExit`
+Servers VPP stops when the Velocity proxy shuts down. This overrides `alwaysOnline` during shutdown. Use `all` to stop every managed server, or list server names. An empty list turns it off.
+
+Type: `List` of `String`. Default: `[]`.
+
+```yaml
+lifecycle:
+  shutdownOnProxyExit:
+    - lobby
+    - survival
+```
+
+To stop everything:
+
+```yaml
+lifecycle:
+  shutdownOnProxyExit:
+    - all
+```
 
 ---
 
-## Whitelist Settings
+## Players and starts
+
+### `playerStartCooldown`
+Seconds a player has to wait before they can start another server by connecting to it. It doesn't apply to `/ptero start`.
+
+Type: `Integer`. Default: `10`.
+
+### `serverNotFoundMessage`
+If `true`, a player who connects to a server that is in `velocity.toml` but not in the VPP `servers` section gets a "server not found in configuration" message. VPP always logs this to the console.
+
+Type: `Boolean`. Default: `false`.
+
+### `alwaysOnline`
+Servers VPP keeps running. VPP starts them once when the proxy starts, then checks every `alwaysOnlineCheckInterval` seconds and starts any that are offline. These servers are never shut down for being idle, whatever their `timeout` says.
+
+Type: `List` of `String`. Default: `["limbo"]`.
+
+```yaml
+alwaysOnline:
+  - limbo
+```
+
+### `alwaysOnlineCheckInterval`
+How often VPP checks the `alwaysOnline` list, in seconds.
+
+Type: `Integer`. Default: `60`.
+
+---
+
+## Online server cap
+
+### `maxOnlineServers`
+The most managed servers that can be online at once. `0` means no limit. Only servers under `servers` count.
+
+Type: `Integer`. Default: `0`.
+
+### `maxOnlineReservations`
+Keeps this many slots under the cap free for always-online servers, limbos and lobbies, so player starts can't fill the whole cap. Player starts are limited to `maxOnlineServers - maxOnlineReservations`. It only applies when `maxOnlineServers` is above `0`.
+
+Type: `Integer`. Default: `0`.
+
+### `queueWhenMaxOnline`
+If `true`, a player who connects while the cap is reached waits in the queue for the server. If `false`, VPP denies the start.
+
+Type: `Boolean`. Default: `true`.
+
+### `maxOnlineAllowBypass`
+If `true`, players with `ptero.maxcap.bypass` can start servers past the cap.
+
+Type: `Boolean`. Default: `true`.
+
+### `maxOnlineExempt`
+Servers that don't count toward the cap and can always start, by Velocity server name.
+
+Type: `List` of `String`. Default: `["hub", "lobby", "limbo"]`.
+
+### `countLobbiesInMaxOnline`
+If `true`, the servers in `lobbyBalancer.lobbies` count toward `maxOnlineServers`. If `false`, VPP leaves them out. When `lobbyBalancer.lobbiesToUse` is above `0`, this only covers the first N lobbies.
+
+Type: `Boolean`. Default: `false`.
+
+### `countLimbosInMaxOnline`
+If `true`, the servers in `lobbyBalancer.limbos` count toward `maxOnlineServers`. If `false`, VPP leaves them out.
+
+Type: `Boolean`. Default: `false`.
+
+---
+
+## Whitelist
 
 ### `whitelistAllowBypass`
-*   **Description:** If `true`, players with the `ptero.bypass` permission can bypass VPP's whitelist check when attempting to start/connect to a server that has `whitelist: true` in its per-server configuration.
-*   **Type:** `Boolean`
-*   **Default:** `true`
-*   **Example:** `whitelistAllowBypass: true`
-    ::: danger Important Distinction
-    This setting only bypasses VPP's *pre-connection check*. It does **not** allow players to bypass the actual `whitelist.json` enforced by the backend Minecraft server itself. If a player bypasses VPP's check but is not on the backend server's whitelist, they will still be unable to join.
-    :::
+If `true`, players with `ptero.bypass` skip VPP's whitelist check on servers with `whitelist: true`.
+
+Type: `Boolean`. Default: `true`.
+
+::: danger The backend whitelist still applies
+This only skips VPP's check before the connection. The Minecraft server still enforces its own `whitelist.json`, and a player who isn't on it can't join.
+:::
 
 ### `whitelistCheckInterval`
-*   **Description:** The interval (in minutes) at which VPP will periodically attempt to re-fetch the `whitelist.json` file from servers that have `whitelist: true` configured. This helps keep VPP's internal whitelist cache up-to-date.
-*   **Type:** `Integer` (minutes)
-*   **Set to `0` or a negative value to disable periodic automatic updates.** Whitelists will still be fetched on plugin load/reload and via `/ptero whitelistReload`.
-*   **Default:** `10`
-*   **Example:** `whitelistCheckInterval: 10`
-    ::: warning MC Server Soft Limitation
-    The whitelist fetching feature (and thus this interval) is **not supported** if your panel is MC Server Soft due to API differences.
-    :::
+How often, in minutes, VPP fetches `whitelist.json` again from servers with `whitelist: true`. `0` or a negative value turns off the periodic fetch. VPP still fetches the whitelists on startup, on `/ptero reload` and on `/ptero whitelistReload`.
+
+Type: `Integer`. Default: `10`.
+
+::: warning Not available on MC Server Soft
+VPP can't fetch files from MC Server Soft, so whitelists don't work there.
+:::
 
 ---
 
-## Panel Connection (`pterodactyl`)
+## Move history
+
+### `moveHistory.enabled`
+If `true`, VPP keeps each player's recent server moves and disconnects in memory for `/ptero history`. Nothing is written to disk, and the history is cleared when the proxy restarts.
+
+Type: `Boolean`. Default: `false`.
+
+### `moveHistory.maxEntriesPerPlayer`
+How many moves VPP keeps per player, newest first. The minimum is `1`.
+
+Type: `Integer`. Default: `50`.
+
+```yaml
+moveHistory:
+  enabled: true
+  maxEntriesPerPlayer: 50
+```
+
+---
+
+## Maintenance
+
+VPP has its own maintenance mode, controlled with `/ptero maintenance`. It can also read maintenance state from kennytv's Maintenance plugin and from addons that register a `MaintenanceProvider`. While any enabled source reports maintenance for a server, VPP doesn't start it.
+
+### `maintenance.builtinEnabled`
+Turns VPP's own maintenance mode on or off. While it is `false`, `/ptero maintenance` refuses to run.
+
+Type: `Boolean`. Default: `true`.
+
+### `maintenance.externalProvidersEnabled`
+If `true`, VPP detects kennytv's Maintenance plugin and uses providers that addons register through `VPPApi.registerMaintenanceProvider(...)`.
+
+Type: `Boolean`. Default: `true`.
+
+```yaml
+maintenance:
+  builtinEnabled: true
+  externalProvidersEnabled: true
+```
+
+---
+
+## Panel connection (`pterodactyl`)
+
 ::: info
-This section of the config is still named `pterodactyl` for compatibility reasons, even if you are using Pelican or MC Server Soft. The plugin will automatically detect the panel type based on the API key format.
+The section is still called `pterodactyl` for compatibility, even if you use Pelican, Calagopus or MC Server Soft. VPP detects the panel type from the API key prefix.
 :::
-Panel URL and API key live here.
 
 ### `pterodactyl.url`
-*   **Description:** The full base URL of your panel.
-*   **Type:** `String`
-*   **Required:** Yes
-*   **Format:** Must include the protocol (`http://` or `https://`). It's generally recommended to ensure it ends with a `/` if your panel requires it for API access (most do).
-*   **Example:** `url: "https://panel.yourdomain.com/"`
-    ::: tip Cloudflare & Proxies
-    If you are using Cloudflare, a reverse proxy, or a tunnel in front of your panel, point the URL at the reachable endpoint and allow the proxy host through any Cloudflare / tunnel IP rules.
-    :::
+The base URL of your panel, including `http://` or `https://`. VPP adds a trailing `/` if it is missing.
+
+Type: `String`. Required.
+
+```yaml
+url: "https://panel.yourdomain.com/"
+```
+
+::: tip Cloudflare and proxies
+If Cloudflare, a reverse proxy or a tunnel sits in front of your panel, point the URL at the address the proxy can reach. Allow the proxy's IP through any Cloudflare or tunnel rules.
+:::
 
 ### `pterodactyl.apiKey`
-*   **Description:** Your Client API Key for the panel.
-*   **Type:** `String`
-*   **Required:** Yes
-*   **Format:**
-    *   For **Pterodactyl Panel**: The key should start with `ptlc_`.
-    *   For **Pelican Panel**: The key should start with `pacc`.
-*   **Location:** You can generate/find this key in your account settings on the panel, usually under "API Credentials" or a similar section.
-*   **Example:** `apiKey: "ptlc_YOUR_CLIENT_API_KEY_HERE"`
-    ::: danger Critical: Use Client API Keys Only!
-    You **must** use a **Client API Key**. Application API Keys (which might start with `ptla_` for Pterodactyl or `peli_` for Pelican) are **NOT supported** by VPP and will result in connection failures. The Client API Key grants permissions on behalf of your user account.
-    ::: info Information for MC Server Soft Users
-    Mc Server Soft doesnt have any kind of distinction between types of Api Keys. There is just one type.
-    :::
+Your client API key. Create it in your account settings on the panel, usually under "API Credentials" or "API Keys".
+
+Type: `String`. Required.
+
+| Prefix | Panel VPP detects |
+| --- | --- |
+| `ptlc_` | Pterodactyl |
+| `plcn_` or `pacc_` | Pelican |
+| `c7sp_` | Calagopus |
+| `ptla_` or `peli_` | Application key. VPP rejects it. |
+| anything else | MC Server Soft |
+
+On Calagopus, give the key `control.start`, `control.stop`, `control.restart` and `files.read-content`. VPP needs these for power actions, status and whitelists.
+
+```yaml
+apiKey: "ptlc_YOUR_CLIENT_API_KEY_HERE"
+```
+
+::: danger Use a client API key
+VPP only works with client API keys. Application keys (`ptla_` on Pterodactyl, `peli_` on Pelican) fail. A client key acts on behalf of your user account.
+:::
+
+::: info MC Server Soft
+MC Server Soft has only one type of API key.
+:::
 
 ---
 
-## Per-Server Configuration (`servers`)
+## Per-server configuration (`servers`)
 
-This section is where you define each individual Minecraft server that VelocityPteroPower should manage. Each entry is a sub-section named after the server as it appears in your `velocity.toml`.
+Every server VPP manages needs an entry here. The entry name must match the server name in `velocity.toml` exactly, including case.
 
 ### `servers.<serverName>`
-*   **Description:** This is the block for a specific server. Replace `<serverName>` with the actual name of your server (e.g., `lobby`, `survival`, `minigames`). This name **must exactly match** the server name defined in your Velocity `velocity.toml` file (case-sensitive).
 
-    Inside each `<serverName>` block, you define the following:
+```yaml
+servers:
+  survival:
+    id: "a1b2c3d4"
+    timeout: 600
+    startupJoinDelay: 15
+    whitelist: true
+```
 
-    #### `id`
-    *   **Description:** The unique identifier of this server *on your panel*.
-    *   **Type:** `String`
-    *   **Required:** Yes
-    *   **How to find:**
-        *   **Pterodactyl:** Look at the URL when viewing the server in the panel. If the URL is `https://panel.example.com/server/a1b2c3d4`, then the ID is `a1b2c3d4`.
-        *   **Pelican:** This is typically the "Short UUID" found in the server's details page on the panel.
-    *   **Example:** `id: "a1b2c3d4"`
+#### `id`
+The server's identifier on the panel. Required.
 
-    #### `timeout`
-    *   **Description:** The time (in seconds) VPP will wait after the last player leaves this specific server before automatically sending a "stop" signal.
-    *   **Type:** `Integer` (seconds)
-    *   **Set to `-1` to disable automatic shutdown for this server when it becomes empty.**
-    *   **Set to `0` to attempt to stop the server immediately after the last player leaves.**
-    *   **Default (if not specified for a server, though it's good practice to specify):** The plugin might have an internal default, but explicitly set it.
-    *   **Example:** `timeout: 300` (5 minutes)
+- **Pterodactyl.** Take it from the server URL. For `https://panel.example.com/server/a1b2c3d4`, the ID is `a1b2c3d4`.
+- **Pelican.** Use the short UUID from the server details page.
+- **Calagopus.** Use the full server UUID from the server URL or details page.
 
-    #### `startupJoinDelay`
-    *   **Description:** After VPP detects that this server has successfully started and is "online" (according to `serverStatusCheckMethod`), it will wait an additional period (in seconds) defined by this value before attempting to connect waiting players to it. This delay allows backend server plugins and worlds to fully load and initialize.
-    *   **Type:** `Integer` (seconds)
-    *   **Default (if not specified):** `10` (as seen in the example config)
-    *   **Example:** `startupJoinDelay: 15` (wait 15 seconds after server reports online)
+Always quote the ID. YAML reads values such as `91e62747` as a number in scientific notation, which can turn into `Infinity`:
 
-    #### `whitelist`
-    *   **Description:** If `true`, VPP will attempt to fetch the `whitelist.json` file for this server from the panel and enforce it for players attempting to start or connect to this server (unless bypassed by permission).
-    *   **Type:** `Boolean`
-    *   **Default:** `false`
-    *   **Example:** `whitelist: true`
-        ::: warning MC Server Soft Limitation
-        As mentioned previously, the whitelist fetching feature is **not supported** if your panel is MC Server Soft. Setting this to `true` for an MC Server Soft panel will likely result in VPP logging warnings and the whitelist check being ineffective.
-        :::
+```yaml
+servers:
+  mc-vanilla-6:
+    id: "91e62747"   # correct
+  mc-vanilla-7:
+    id: 91e62747     # wrong, YAML parses this as a number
+```
+
+If the log shows `Invalid type for 'id'` or `Invalid 'id' value ... Quote the ID in YAML`, quote the ID and reload.
+
+VPP skips any server whose ID is `1234abcd`, the placeholder in the shipped example.
+
+#### `timeout`
+Seconds VPP waits after the last player leaves before it stops the server. `-1` turns off automatic shutdown for this server. `0` stops it as soon as the last player leaves.
+
+Type: `Integer`. Default if missing: `-1`.
+
+#### `startupJoinDelay`
+Once the server counts as online under `serverStatusCheckMethod`, VPP waits this many more seconds before it moves waiting players there. Backend plugins and worlds can finish loading in that time.
+
+Type: `Integer`. Default if missing: `10`.
+
+#### `whitelist`
+If `true`, VPP fetches the server's `whitelist.json` from the panel and checks it when a player tries to start the server. Players with `ptero.bypass` skip the check when `whitelistAllowBypass` is on.
+
+Type: `Boolean`. Default: `false`.
+
+::: warning Not available on MC Server Soft
+VPP can't fetch files from MC Server Soft. With `whitelist: true` on that panel, VPP logs warnings and the check does nothing.
+:::
+
+#### `group`
+A shared group name. Starting one member also starts the group's offline members. VPP doesn't shut down idle members while any member of the group still has players. You can also define groups in [`serverGroups`](#servergroups).
+
+Type: `String`. Optional.
+
+#### `linkedServers`
+Servers VPP starts together with this one, even if they belong to other groups.
+
+Type: `List` of `String`. Optional.
+
+```yaml
+linkedServers:
+  - skywars-db
+```
+
+#### `startPassword`
+A single-use start password, as an alternative to the whitelist. A player has to run `/ptero unlock <server> <password>` before they can start the server, and the password is used up after one successful unlock. Players with `ptero.password.bypass` don't need it. To set a new password, reload the config or use `/ptero password set|generate`.
+
+Type: `String`. Optional.
+
+#### `profile`
+The name of an entry in [`profiles`](#profiles). The server takes every field it doesn't set itself from that profile.
+
+Type: `String`. Optional.
+
+#### Overrides
+These keys replace the global value for this server only:
+
+- `startupPollInterval`
+- `startupTimeoutSeconds` (minimum `30`)
+- `serverStatusCheckMethod`
+
+### `profiles`
+Named sets of server settings. A server with `profile: <name>` takes every field it doesn't set itself from the profile. A profile can set `timeout`, `startupJoinDelay`, `whitelist`, `startupPollInterval`, `startupTimeoutSeconds`, `serverStatusCheckMethod`, `group`, `linkedServers` and `startPassword`.
+
+```yaml
+profiles:
+  survival:
+    startupJoinDelay: 15
+    startupTimeoutSeconds: 300
+    serverStatusCheckMethod: HYBRID
+  limbo:
+    startupJoinDelay: 0
+    startupPollInterval: 3
+    serverStatusCheckMethod: PANEL_API
+    timeout: -1
+```
+
+### `serverGroups`
+Groups defined in one place. They combine with the per-server `group` key. If a server sets its own `group`, that value wins. Starting any member also starts the offline members, and VPP doesn't shut down idle members until the whole group is empty.
+
+```yaml
+serverGroups:
+  minigames:
+    - skywars
+    - bedwars
+```
 
 ---
 
-::: details Example `config.yml` (fileversion: 13)
-```yaml
+## Lobby and limbo balancer (`lobbyBalancer`)
 
-###########################################################
-#                    VelocityPteroPower                  #
-#                       by TubYoub                      #
-###########################################################
+VPP can spread players across several lobbies, keep a number of them online, start more under load, and send players to a limbo while their target server starts. [Lobbies and limbo](lobbies-and-limbo.md) covers how this works in practice.
+
+VPP can only start or measure servers listed under `servers` with a valid panel ID. A lobby or limbo outside `servers` has to be online already for VPP to use it.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `enableBuiltin` | `true` | Turns the built-in balancer on or off. Routing providers from addons run first and VPP falls back to the built-in balancer while this is `true`. A registered provider does not turn it off. |
+| `lobbies` | `["lobby"]` | Lobby servers VPP balances and uses as holding servers. Each one must also be listed under `servers:`. Order matters when `lobbiesToUse` is set. |
+| `limbos` | `["limbo"]` | Limbo servers where players wait while their target starts. |
+| `lobbiesToUse` | `0` | Only the first N lobbies take part in balancing. `0` uses all of them. |
+| `strategy` | `"ROUND_ROBIN"` | `ROUND_ROBIN` takes the next server in turn, `LEAST_PLAYERS` the one with the fewest players, `LEAST_CPU` the one with the lowest CPU use according to the panel. |
+| `healthCheckInterval` | `15` | Seconds between reachability checks and scaling decisions. |
+| `minOnline` | `1` | Keeps at least this many lobbies online. `0` sets no minimum. |
+| `maxOnline` | `0` | Keeps no more than this many lobbies online. `0` sets no limit. |
+| `playersPerServer` | `80` | Roughly how many players a lobby holds. VPP uses it for scaling decisions. |
+| `cpuScaleUpThreshold` | `85.0` | With `LEAST_CPU`, VPP starts another lobby when any online lobby passes this CPU percentage. |
+| `autoScaleEnabled` | `true` | Starts more lobbies when needed. |
+| `preStartThresholdPercent` | `80` | VPP starts another lobby when the players on online lobbies reach this percentage of their total capacity (`online lobbies * playersPerServer`). |
+| `startFailureFallbackSeconds` | `60` | If a started lobby isn't online after this many seconds, VPP tries a different one. |
+| `startFailureCooldownSeconds` | `120` | Seconds VPP waits after a failed start before it tries the same lobby again. |
+| `scaleDownEnabled` | `true` | Stops empty extra lobbies until only `minOnline` remain. |
+| `scaleDownIdleSeconds` | `300` | How long a lobby above `minOnline` has to stay empty before VPP stops it. The minimum is `30`. |
+| `sendToLimboOnStart` | `true` | Sends players to a limbo while their target starts, and queues them for the target. VPP uses a lobby if no limbo is reachable. If `false`, players stay on their current server while they wait, and players coming straight from the proxy are disconnected. If the key is missing, it is `true` when `limbos` has entries and `false` otherwise. |
+| `forcedHostOfflineBehavior` | `LOBBY_OR_LIMBO` | What happens when a player joins through a forced host and the target is offline. `DISCONNECT` disconnects them. `LOBBY_OR_LIMBO` tries a lobby, then a limbo, then disconnects. `LIMBO_ONLY` tries a limbo, then disconnects. This works on its own, so you can keep `sendToLimboOnStart: false` and still keep first-join players connected. If the key is missing, VPP uses `DISCONNECT`. An invalid value falls back to `LOBBY_OR_LIMBO`. |
+
+Older configs had a single `limboServer` key. VPP moves its value into `lobbyBalancer.limbos` and removes the old key. Keep limbos lightweight and put them in `alwaysOnline` if you can.
+
+### How selection works
+- VPP picks a lobby if one is available and falls back to a limbo.
+- The `strategy` decides which lobby or limbo it picks.
+- On each health check, VPP checks which lobbies are reachable and starts lobbies until `minOnline` are running.
+- When player load passes `preStartThresholdPercent`, or a lobby passes `cpuScaleUpThreshold` under `LEAST_CPU`, VPP starts the next offline lobby that isn't in its failure cooldown.
+- If no lobby or limbo is usable, players stay where they are or are disconnected until the target starts.
+
+---
+
+## Addons (`addons`)
+
+VPP loads addon JARs from `plugins/velocity-ptero-power/addons/`. See [Addons](addons.md) for installing them.
+
+### `addons.catalogUrl`
+The URL of the official addon catalog.
+
+Default: `https://raw.githubusercontent.com/Tubs-Pluginz/VelocityPteroPower/dev/catalog/addons.json`
+
+### `addons.extraCatalogUrls`
+More catalog JSON URLs that follow the same schema as `catalog/addons.json`.
+
+Type: `List` of `String`. Default: `[]`.
+
+### `addons.extraEntries`
+Catalog entries written directly in the config, for private or one-off addons. Each entry takes `id`, `name`, `description`, `authors`, `latestVersion`, `downloadUrl`, `apiVersion` and an optional `homepage`.
+
+Type: `List`. Default: `[]`.
+
+```yaml
+addons:
+  extraEntries:
+    - id: my-addon
+      name: My Addon
+      description: Private addon
+      authors: ["You"]
+      latestVersion: "1.0.0"
+      downloadUrl: "https://example.com/my-addon-1.0.0.jar"
+      apiVersion: "1.0.0"
+```
+
+### `addons.autoLoadOnStartup`
+If `true`, VPP loads the enabled addon JARs when the proxy starts.
+
+Type: `Boolean`. Default: `true`.
+
+---
+
+## Messages and localization
+
+VPP keeps the texts that players and the console see in YAML files, so you can change the wording without touching the plugin JAR.
+
+- The files are in `plugins/velocity-ptero-power/messages/`.
+- Each file is named `<locale>.yml`. VPP ships `en_US.yml` (English) and `de_DE.yml` (German).
+- If a key is missing from your language file, VPP uses the value from `en_US.yml`.
+- When an update adds messages, VPP adds the new keys to your files on the next start and keeps your edits.
+- VPP no longer reads the old single `messages.yml` file. If it still exists, VPP logs an error asking you to remove it.
+
+### Choosing the language
+`languageOverride` in `config.yml` decides the language.
+
+```yaml
+languageOverride: auto  # or "en_US" / "de_DE"
+```
+
+With `auto`, VPP checks these in order and uses the first one that is set:
+
+1. the `velocitypteropower.lang` Java system property
+2. the `VPP_LANG` environment variable
+3. the JVM's default locale
+
+VPP can only load a language it ships with. If the chosen locale has no bundled file, VPP logs a warning and uses `en_US`. To change texts, edit `en_US.yml` or `de_DE.yml` in the `messages` folder.
+
+### Editing messages
+- Messages use MiniMessage formatting. You can use colors and tags such as `<green>` and `<bold>`.
+- Some messages contain placeholders such as `<server>`, `<count>`, `<reason>` or `<remaining>`. Keep them, or the message loses that information.
+- YAML strings can be quoted, or written as `|` block scalars for multi-line text.
+
+::: tip Reload
+After editing files in `plugins/velocity-ptero-power/messages/`, run `/ptero reload` to apply the changes without restarting Velocity.
+:::
+
+---
+
+::: details Default `config.yml` (fileversion: 17)
+```yaml
+################################
+#      VelocityPteroPower      #
+#         by TubYoub            #
+################################
 
 # Version of the configuration file
-fileversion: '13'
+fileversion: 17
 
+# Check for updates
+# If true, the plugin will check for updates on startup.
+# If a new version is available, a message will be sent to the console and to players with the permission "ptero.reload".
 checkUpdate: true
 
 # Override the language used for plugin messages.
@@ -401,12 +685,12 @@ languageOverride: auto
 # 30 = Warning
 # 40 = Error
 #default: 20
-loggerLevel: 10
+loggerLevel: 20
 
-# How many Threads should be used to check the server status
-# The more threads the more requests can be handled at the same time
-# more threads = more resources used
-# restart the server so changes take effect
+# How many threads the API client should use for HTTP work.
+# VPP auto-scales threads to roughly 2x the number of configured servers (clamped between 4 and 64).
+# If you set apiThreads higher than that baseline, your configured value overrides the baseline.
+# More threads = more parallel requests but also more resource usage. Restart/reload to apply.
 # default: 10
 apiThreads: 10
 
@@ -415,23 +699,30 @@ apiThreads: 10
 printRateLimit: false
 
 # Choose the method to check if a managed server is online and ready.
-# "VELOCITY_PING": Velocity ping only (cheap; may be early).
-# "PANEL_API": Panel process state only (accurate for "running"; burns rate limit).
-# "HYBRID": Panel running AND Velocity ping (0.9.6 default).
+# "VELOCITY_PING": Uses Velocity's built-in ping functionality. Requires the server
+#                  to be registered in Velocity's config and accessible from the proxy.
+#                  Less resource-intensive, doesn't use API rate limits. Might report
+#                  online slightly before the server is fully joinable.
+#                  Some simple Limbo servers might not report any Ping back suing this method.
+# "PANEL_API": Uses the panel API (Pterodactyl/Pelican/Calagopus) to check the server's state.
+#                    More accurate for actual server state ("running"), but uses API
+#                    requests and counts towards rate limits.
+# "HYBRID": Requires both panel "running" AND a successful Velocity ping before treating
+#           the server as ready (best for avoiding premature joins / kicks).
 # Default: "HYBRID"
-serverStatusCheckMethod: HYBRID
+serverStatusCheckMethod: "HYBRID"
 
 # How long the ping to the server lasts, to check if its is online, until it times out (in milliseconds)
-# default: 1000
-pingTimeout: 5000
+# default: 1000 (1 second)
+pingTimeout: 1000
 
 # How many retrys to shut down the server if the previous one failed
 # default: 3
 shutdownRetries: 3
 
 # How long to wait before retrying to shut down the server (in seconds)
-# default: 30
-shutdownRetryDelay: 30
+# default: 300
+shutdownRetryDelay: 300
 
 # How long to wait before shutting down the server if no player joined the server(in seconds)
 # default: 300
@@ -443,31 +734,77 @@ idleStartShutdownTime: 300
 playerStartCooldown: 10
 
 # How long (in seconds) the plugin should wait for the first check if the server is online
-# Per-server startupJoinDelay is settle AFTER online — not a poll interval.
+# Maybe consider changing this to a lower value if you have for example a
+# limbo which is lightweight and starts fast
 # default: 10
 startupInitialCheckDelay: 10
 
-# How often to poll while waiting for online (seconds). Independent of startupJoinDelay.
+# How often (in seconds) to poll while waiting for a server to come online.
+# Independent of startupJoinDelay (which is the post-online settle delay).
 # default: 5
 startupPollInterval: 5
 
-# Max wait for online after a start signal before startupTimeoutPolicy applies.
-# default: 180 (minimum 30)
+# Maximum time (in seconds) to wait for a server to become online after a start signal.
+# default: 180
 startupTimeoutSeconds: 180
 
-# CANCEL = clear waiters + starting; KEEP_STARTING = clear waiters, leave starting.
+# What to do when startupTimeoutSeconds elapses:
+# CANCEL         → clear waiters and starting state (default)
+# KEEP_STARTING  → clear player waiters but leave starting state so they can re-queue
 # default: CANCEL
 startupTimeoutPolicy: CANCEL
 
-# Soft-requeue after early SERVER_DISCONNECTED kicks post-transfer.
+# After an auto-connect transfer, if the backend kicks with SERVER_DISCONNECTED within this
+# many seconds, soft-requeue the player (settle again) instead of cancelling.
+# default: 30
 softRequeueGraceSeconds: 30
+
+# Max soft-requeue attempts after premature kicks during start-wait transfers.
+# default: 3
 softRequeueMaxAttempts: 3
+
+# Pause background prefetch when remaining API requests fall to this threshold (or waiters exist).
+# default: 5
+rateLimitBackgroundPauseThreshold: 5
+
+# If the panel never sends X-RateLimit-Reset, wait this many seconds before probing again when remaining is 0.
+# default: 60
+rateLimitProbeFallbackSeconds: 60
+
+# Persist start-wait queues to disk so players can resume after reconnect.
+# default: true
+persistentQueueEnabled: true
+
+# How long (seconds) a disconnected player's queue entry remains valid.
+# default: 900 (15 minutes)
+persistentQueueTtlSeconds: 900
+
+# Subscribe to Pterodactyl/Pelican/Calagopus Wings websockets for live server state (reduces polling).
+# default: true
+panelWebSocketEnabled: true
+
+# How often to (re)ensure websocket subscriptions for managed servers.
+# default: 120
+panelWebSocketRefreshSeconds: 120
+
+# TTL for cached live panel states from websocket (seconds).
+# default: 30
+serverStateCacheTtlSeconds: 30
+
+# Reserve this many online slots for always-online / limbo / lobby so player starts cannot fill the entire cap.
+# Only applies when maxOnlineServers > 0. default: 0
+maxOnlineReservations: 0
+
+# When max online is reached, queue the player for the target instead of hard-denying (start-on-join).
+# default: true
+queueWhenMaxOnline: true
 
 # Servers to ignore when the stopIdle command is used
 # THIS DOES NOT AFFECT forceStop
 stopIdleIgnore:
-- hub
-- limbo
+  - hub
+  - lobby
+  - limbo
 
 # If a player should receive a message when a server is not found in the config
 # message will always be send to console
@@ -477,7 +814,7 @@ serverNotFoundMessage: false
 # Allow players with the permission "ptero.bypass" to bypass the whitelist when starting a server.
 # This does not work to get around a whitelist because it is enforced by the backend server itself.
 # default: true
-whitelistAllowBypass: false
+whitelistAllowBypass: true
 
 # How long (in minutes) VPP should wait in between checks for a new whitelist and enforce it (if enabled)
 # default: 10
@@ -493,8 +830,9 @@ maxOnlineAllowBypass: true
 
 # Servers excluded from the above cap (by Velocity server name)
 maxOnlineExempt:
-- hub
-- limbo
+  - hub
+  - lobby
+  - limbo
 
 # Whether to include lobbyBalancer lobbies in the maxOnlineServers count
 # default: false
@@ -506,8 +844,7 @@ countLimbosInMaxOnline: false
 
 # Servers that should always be kept online. The plugin will periodically check and start them if offline.
 alwaysOnline:
-- hub
-- limbo
+  - limbo
 
 # How often to check/enforce the alwaysOnline list (in seconds)
 # default = 60
@@ -530,258 +867,215 @@ resourcePrefetchEnabled: true
 # default = 60
 idleShutdownCheckInterval: 60
 
+# In-memory player move history (server switch history)
+# Pretty display command: /ptero history [player]
+# Data is NOT saved to disk; only kept while the proxy is running
+moveHistory:
+  enabled: false
+  # Maximum number of recent moves to retain per player (latest first)
+  maxEntriesPerPlayer: 50
+
+# Maintenance cold-start gate
+# VPP always ships its own /ptero maintenance mode. Networks that already run
+# kennytv/Maintenance (or an addon that registers MaintenanceProvider) can keep
+# both, or disable either side independently.
+maintenance:
+  # Built-in VPP maintenance (/ptero maintenance [server|global] on|off)
+  # default = true
+  builtinEnabled: true
+  # External providers: auto-detect kennytv/Maintenance + addon SPI registrations
+  # via VPPApi.registerMaintenanceProvider(...)
+  # default = true
+  externalProvidersEnabled: true
+
 # Lifecycle related behavior
 lifecycle:
   # When the proxy shuts down, stop these servers.
   # Use "all" to stop all managed servers, or provide a list of specific server names.
   # This overrides 'alwaysOnline' during shutdown.
+  # Leave the list empty to disable stopping servers on proxy shutdown (default behavior).
+  # To stop all managed servers on shutdown, set:
+  #   shutdownOnProxyExit:
+  #     - all
+  # Or list specific servers by name.
   shutdownOnProxyExit: []
 
 # Multi-lobby/limbo balancer settings
 lobbyBalancer:
-  # A list of lobby servers to use for player transfers and first-join routing (if you route players there).
-  # Order matters if lobbiesToUse is set; only the first N will be considered active.
-  lobbies:
-  - hub
-  
-  # Optional list of limbo servers to use while target servers are starting.
-  limbos:
-  - limbo
-  
-  # How many lobbies from the list above should be considered for balancing (0 = use all listed)
-  # default = 0
-  lobbiesToUse: 0
-  
-  # Balancer strategy: ROUND_ROBIN, LEAST_PLAYERS, or LEAST_CPU
-  # default = ROUND_ROBIN
-  strategy: ROUND_ROBIN
-  
-  # Periodic health check interval in seconds for verifying reachability and planning scale-ups
-  # default = 15
-  healthCheckInterval: 15
-  
-  # Keep at least this many lobby servers online (0 = no minimum)
-  # default = 1
-  minOnline: 1
-  
-  # Do not keep more than this many lobby servers online (0 = unlimited)
-  # default = 0
-  maxOnline: 0
-  
-  # Approximate players-per-lobby capacity used to decide when to scale up
-  # default = 80
-  playersPerServer: 80
-  
-  # Only used with LEAST_CPU strategy. If any lobby exceeds this CPU percent, consider scaling up
-  # default = 85.0
-  cpuScaleUpThreshold: 85.0
-  
-  # If true, balancer will auto-start additional lobbies when needed
-  # default = true
-  autoScaleEnabled: true
-  
-  # Start another lobby before capacity is completely full.
-  # When total players across online lobbies reach this percent of capacity, VPP starts another lobby (if available).
-  # default = 80 (means start a new lobby at ~80% of total lobby capacity)
-  preStartThresholdPercent: 80
-  
-  # If a lobby was started but doesn't come online within this many seconds, VPP will try starting a different lobby.
-  # default = 60
-  startFailureFallbackSeconds: 60
-  
-  # After a failed start, wait this many seconds before trying that same lobby again.
-  # default = 120
-  startFailureCooldownSeconds: 120
-  
-  # When a target server is starting, send players to a limbo (if available) and auto-queue them.
-  # If false, players will stay on their current server (or be disconnected if coming from proxy) while queued.
-  # default = false
-  sendToLimboOnStart: true
-  
-  # Behavior for forced-host joins when the target backend is offline
-  # DISCONNECT       → disconnect (default)
-  # LOBBY_OR_LIMBO  → try a lobby first, then a limbo; if none, disconnect
-  # LIMBO_ONLY      → only try limbo; if none, disconnect
-  forcedHostOfflineBehavior: LOBBY_OR_LIMBO
+  # Enable the built-in balancer logic provided by VPP. If you plan to use an external addon that registers a RoutingProvider,
+  # you can set this to false to disable the built-in balancer entirely. Routing providers do NOT automatically disable the
+  # built-in balancer; providers run first and VPP falls back to the built-in balancer if this is true.
+  enableBuiltin: true
 
-# Pterodactyl configuration
-pterodactyl:
-  # The URL of your pterodactyl panel
-  # If you use Cloudflare Tunnel, you need to allow the ip in the bypass setting.
-  url: https://panel.domain.tld/
-  # Your API Key should start with "ptlc_" or "pacc" if you are using the Ptero or Peli Panel
-  # You can find the client api key in the "API Credentials" tab of the "Account" page.
-  apiKey: ptlc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-
-# Per server configuration
-servers:
-  lobby: # Example server 1
-    id: "a1b2c3d4"
-    timeout: -1 # Never auto-stop lobby
-    startupJoinDelay: 5
-    whitelist: false
-  survival: # Example server 2
-    id: "e5f6g7h8"
-    timeout: 600 # Stop after 10 minutes empty
-    startupJoinDelay: 15
-    whitelist: true
-  minigame-1: # Example server 3
-    id: "i9j0k1l2"
-    timeout: 120 # Stop after 2 minutes empty
-    startupJoinDelay: 10
-    whitelist: false
-```
-:::
-
----
-
-## Multi-Lobby and Limbo Balancer
-
-VelocityPteroPower supports multiple lobbies and limbos for player redirection and waiting rooms while target servers are starting. This feature is fully configurable via the `lobbyBalancer` section in `config.yml`.
-
-### Why use multiple lobbies/limbos?
-- Distribute players evenly (round-robin) or intelligently (least players, least CPU)
-- Keep a defined number of lobbies online and auto-start more when load increases
-- Provide redundancy: if one lobby/limbo is offline, others can still be used
-
-### Configuration (`lobbyBalancer`)
-```yaml
-lobbyBalancer:
   # A list of lobby servers to use for player transfers and first-join routing (if you route players there).
   # Order matters if lobbiesToUse is set; only the first N will be considered active.
   lobbies:
     - lobby
-    - hub
+    # - hub  # optional: add additional lobby servers here if configured under servers
 
   # Optional list of limbo servers to use while target servers are starting.
   limbos:
     - limbo
 
   # How many lobbies from the list above should be considered for balancing (0 = use all listed)
+  # default = 0
   lobbiesToUse: 0
 
   # Balancer strategy: ROUND_ROBIN, LEAST_PLAYERS, or LEAST_CPU
+  # default = ROUND_ROBIN
   strategy: "ROUND_ROBIN"
 
   # Periodic health check interval in seconds for verifying reachability and planning scale-ups
+  # default = 15
   healthCheckInterval: 15
 
   # Keep at least this many lobby servers online (0 = no minimum)
+  # default = 1
   minOnline: 1
 
   # Do not keep more than this many lobby servers online (0 = unlimited)
+  # default = 0
   maxOnline: 0
 
   # Approximate players-per-lobby capacity used to decide when to scale up
+  # default = 80
   playersPerServer: 80
 
   # Only used with LEAST_CPU strategy. If any lobby exceeds this CPU percent, consider scaling up
+  # default = 85.0
   cpuScaleUpThreshold: 85.0
 
   # If true, balancer will auto-start additional lobbies when needed
+  # default = true
   autoScaleEnabled: true
 
-  # Start another lobby before capacity is completely full
+  # Start another lobby before capacity is completely full.
+  # When total players across online lobbies reach this percent of capacity, VPP starts another lobby (if available).
+  # default = 80 (means start a new lobby at ~80% of total lobby capacity)
   preStartThresholdPercent: 80
 
-  # If a lobby doesn't come online in time, try a different one
+  # If a lobby was started but doesn't come online within this many seconds, VPP will try starting a different lobby.
+  # default = 60
   startFailureFallbackSeconds: 60
 
-  # Cooldown before retrying a failed lobby
+  # After a failed start, wait this many seconds before trying that same lobby again.
+  # default = 120
   startFailureCooldownSeconds: 120
+
+  # Scale down empty extra lobbies back toward minOnline after they have been idle.
+  # default = true
+  scaleDownEnabled: true
+
+  # How long (seconds) an empty lobby above minOnline must stay empty before stop.
+  # default = 300
+  scaleDownIdleSeconds: 300
+
+  # When a target server is starting, send players to a limbo (if available) and auto-queue them.
+  # Falls back to a configured lobby when no limbo is reachable.
+  # If false, players will stay on their current server (or be disconnected if coming from proxy) while queued.
+  # default = true when lobbyBalancer.limbos is non-empty; otherwise false
+  sendToLimboOnStart: true
+
+  # Behavior for forced-host joins when the target backend is offline
+  # DISCONNECT       → disconnect (default)
+  # LOBBY_OR_LIMBO  → try a lobby first, then a limbo; if none, disconnect
+  # LIMBO_ONLY      → only try limbo; if none, disconnect
+  forcedHostOfflineBehavior: LOBBY_OR_LIMBO
+
+# Panel configuration
+pterodactyl:
+  # The URL of your panel (Pterodactyl / Pelican / Calagopus)
+  # If you use Cloudflare Tunnel, you need to allow the ip in the bypass setting.
+  url: "https://panel.example.com"
+  # The client API key of your panel.
+  # Supported prefixes: "ptlc_" (Pterodactyl), "plcn_"/"pacc_" (Pelican), "c7sp_" (Calagopus).
+  # Find it under Account → API Credentials / API Keys.
+  # Calagopus: grant control.start/stop/restart + files.read-content for power/status/whitelist.
+  apiKey: "ptlc_000000000000000000000000000000000000000000"
+
+# Per server configuration
+# Make sure that the server names match the registered servers in the velocity.toml
+servers:
+  #server name
+  example:
+
+    # Panel server ID
+    # You can find the Panel server ID in the URL of the server page.
+    # For example, if the URL is https://panel.example.com/server/1234abcd, the server ID is 1234abcd.
+    # For Pelican, you need the short UUID from Server Details.
+    # For Calagopus, use the full server UUID from the server URL / details page.
+    # IMPORTANT: Always quote the ID to prevent YAML from parsing it as a number (e.g., 91e62747 would become Infinity if unquoted)
+
+    id: "1234abcd"
+
+    # The time in seconds to stop the server after the last player leaves.
+    # If you don't want to stop the server automatically, set it to -1.
+    # If you set it to 0, the server will be stopped immediately after the last player leaves.
+
+    timeout: 30
+
+    # The time (in seconds) VPP should wait AFTER the server is online before auto-connecting.
+    # Useful when plugins need a few seconds to finish loading after ping/API reports ready.
+    startupJoinDelay: 10
+
+    # Optional: shared group name. Starting one member also starts offline peers;
+    # idle-shutdown is skipped while any group member still has players.
+    # group: "minigames"
+
+    # Optional: explicitly linked servers also started with this one (even across groups).
+    # linkedServers:
+    #   - skywars-db
+
+    # Optional: single-use start password (alternative to whitelist). Players unlock with
+    # /ptero unlock <server> <password>; the password is consumed after one successful unlock.
+    # startPassword: "change-me"
+
+    # Optional overrides (omit to use global defaults):
+    # startupPollInterval: 5
+    # startupTimeoutSeconds: 180
+    # serverStatusCheckMethod: HYBRID
+    # profile: survival
+
+    # If VPP should fetch the whitelist of the Server and enforce it when a player trys to start a server
+    # default: false
+    whitelist: false
+
+# Optional named profiles. Servers can set profile: <name> and override individual fields.
+# profiles:
+#   survival:
+#     startupJoinDelay: 15
+#     startupTimeoutSeconds: 300
+#     serverStatusCheckMethod: HYBRID
+#   limbo:
+#     startupJoinDelay: 0
+#     startupPollInterval: 3
+#     serverStatusCheckMethod: PANEL_API
+#     timeout: -1
+
+# Optional explicit server groups (merged with per-server group:).
+# Starting any member also starts offline peers; idle-shutdown waits for the whole group.
+# serverGroups:
+#   minigames:
+#     - skywars
+#     - bedwars
+
+# VPP-managed addons (JARs under plugins/velocity-ptero-power/addons/)
+addons:
+  # Official catalog (GitHub raw). Operators can extend it with extraCatalogUrls / extraEntries.
+  catalogUrl: "https://raw.githubusercontent.com/Tubs-Pluginz/VelocityPteroPower/dev/catalog/addons.json"
+  # Additional catalog JSON URLs (same schema as catalog/addons.json)
+  extraCatalogUrls: []
+  # Inline catalog entries for one-off / private addons
+  # extraEntries:
+  #   - id: my-addon
+  #     name: My Addon
+  #     description: Private addon
+  #     authors: ["You"]
+  #     latestVersion: "1.0.0"
+  #     downloadUrl: "https://example.com/my-addon-1.0.0.jar"
+  #     apiVersion: "1.0.0"
+  extraEntries: []
+  # Load enabled addon JARs automatically on proxy start
+  autoLoadOnStartup: true
 ```
-
-#### Fine-tuning (optional)
-- sendToLimboOnStart: When a target server is starting, send players to a limbo (if available) and auto-queue them once ready. If false, players stay put (or disconnect on forced-host) while queued. Default: true when `limbos` is non-empty after load.
-- forcedHostOfflineBehavior: Controls what happens when a player connects via a forced host and the target backend is offline. Options: DISCONNECT (default), LOBBY_OR_LIMBO (try lobby first, then limbo), LIMBO_ONLY (only try limbo). Works independently of sendToLimboOnStart so you can keep that false but still avoid disconnects for first-join players.
-- preStartThresholdPercent: Start another lobby a bit earlier so players don’t pile up when you’re close to full. Example: 80 means “start new at ~80% capacity”.
-- startFailureFallbackSeconds: If a lobby was started but still isn’t online after this many seconds, VPP will try starting a different lobby.
-- startFailureCooldownSeconds: After a failed start, VPP will wait this long before trying that same lobby again.
-
-### How it works
-- Selection:
-  - Lobbies are preferred over limbos if available; otherwise a limbo is used.
-  - Strategy determines which specific server is chosen:
-    - ROUND_ROBIN: cycles through available servers
-    - LEAST_PLAYERS: picks the server with the fewest connected players
-    - LEAST_CPU: uses panel resource endpoint to choose the lowest CPU server
-- Health and scaling:
-  - Periodically checks reachability of configured lobbies.
-  - Ensures at least `minOnline` lobbies are running (auto-starts if necessary).
-  - If overall lobby capacity is >90% full (players vs playersPerServer) or LEAST_CPU threshold is exceeded, auto-starts an additional lobby if possible.
-- If no limbos are usable, players may be disconnected or kept where they are until the target starts.
-
-### Notes
-- For auto-start/CPU-based decisions VPP can only control servers that are listed under the `servers:` section with valid panel IDs. Unmanaged servers must already be online to be considered usable.
-- Logging respects your global `loggerLevel`; set `10` for detailed debugging during setup.
-
-# Configuration
-
-Important note about server IDs under `servers`:
-
-- Always wrap the `id` value in quotes. YAML can parse values like `91e62747` as a number in scientific notation. This may overflow to `Infinity`, causing the plugin to misread the ID.
-- Correct:
-  servers:
-    mc-vanilla-6:
-      id: "91e62747"
-
-- Incorrect (will be parsed as a number):
-  servers:
-    mc-vanilla-6:
-      id: 91e62747
-
-If the plugin reports an error like "Invalid type for 'id' ... Quote the ID in YAML", edit your config to quote the `id` and reload the plugin.
-
----
-
-## Messages & Localization
-
-VPP’s player- and console-facing texts are stored in simple YAML “message files.” This lets you translate or customize wording without changing the plugin JAR.
-
-- Location on disk: plugins/velocity-ptero-power/messages/
-- File naming: `<locale>.yml` (for example en_US.yml, de_DE.yml)
-- Shipped locales: en_US (English), de_DE (German)
-- Fallbacks: If a key is missing in your selected locale, VPP falls back to en_US for that key.
-
-### Choosing the language
-- Global override: Set languageOverride in config.yml
-  - auto (default): Uses the environment (Velocity/system) locale when available
-  - en_US, de_DE, or another locale code: Forces that language for all messages
-
-```yaml
-# In config.yml
-languageOverride: auto  # or "en_US" / "de_DE"
-```
-
-### Editing messages safely
-- Format: Messages use MiniMessage formatting (Velocity). You can use colors, bold, and simple tags like `<green>`, `<bold>`, etc.
-- Placeholders: Some messages include placeholders like `<server>`, `<time>`, `<player>`, `<reason>`. Keep these placeholders intact or your message may miss important data.
-- Multi-line: YAML strings can be quoted or written as | block scalars if you prefer multi-line text.
-
-::: tip Quick reload
-After editing files in plugins/velocity-ptero-power/messages/, run /ptero reload to apply changes without restarting Velocity.
 :::
-
-### Adding a new language
-1. Copy en_US.yml to a new file named with your locale code (for example fr_FR.yml).
-2. Translate the values on the right-hand side, keeping any placeholders (e.g., `<server>`) unchanged.
-3. Set languageOverride: fr_FR (or leave auto if your environment uses that locale).
-
-### Keeping up with updates
-- When VPP adds new messages in updates, compare your custom file with the latest en_US.yml and add missing keys.
-- If a key is removed upstream, keeping it in your custom file won’t break anything, but it will no longer be used.
-- If a message doesn’t exist in your file, VPP uses the en_US default for that key.
-
-
----
-
-## Addons
-
-### `addons.catalogUrl` / `addons.extraCatalogUrls` / `addons.extraEntries`
-*   Official catalog defaults to the GitHub raw `catalog/addons.json` on the `dev` branch.
-*   Operators can add extra catalog URLs or inline entries.
-*   See [Addons](addons.md) for install paths (GitHub assets vs Modrinth pages).
-
-### `addons.autoLoadOnStartup`
-*   **Default:** `true` — load jars from `plugins/velocity-ptero-power/addons/` on boot.
-
